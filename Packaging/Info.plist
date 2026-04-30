@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
+
+    <key>CFBundleExecutable</key>
+    <string>max_clawdroom</string>
+
+    <key>CFBundleIdentifier</key>
+    <string>com.peterhanily.max_clawdroom</string>
+
+    <!-- Bundle icon (🌝 full-moon glyph). Rendered by tools/build-icon.sh
+         into Packaging/AppIcon.icns; package.sh copies it into
+         Contents/Resources at bundle time. CFBundleIconFile is the
+         name without extension; CFBundleIconName is the modern asset
+         name (used by Asset Catalogs). Including both keeps Finder,
+         Launchpad, Spotlight, and Dock-fallback all happy. -->
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
+    <key>CFBundleIconName</key>
+    <string>AppIcon</string>
+
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+
+    <key>CFBundleName</key>
+    <string>max_clawdroom</string>
+
+    <key>CFBundleDisplayName</key>
+    <string>max_clawdroom</string>
+
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+
+    <key>CFBundleShortVersionString</key>
+    <string>0.2.0</string>
+
+    <key>CFBundleVersion</key>
+    <string>2</string>
+
+    <key>LSMinimumSystemVersion</key>
+    <string>14.0</string>
+
+    <!-- Menu-bar-only app. Suppresses the Dock icon and the generic
+         window-focus menu, so max_clawdroom lives purely in the status
+         bar + overlay windows. -->
+    <key>LSUIElement</key>
+    <true/>
+
+    <key>NSHighResolutionCapable</key>
+    <true/>
+
+    <key>NSHumanReadableCopyright</key>
+    <string>Copyright © 2026 Peter Hanily. All rights reserved.</string>
+
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
+
+    <!-- Usage descriptions. Required for notarization any time an
+         entitlement is present OR a TCC-gated API is called at runtime.
+         Strings are shown to the user in the system consent prompt. -->
+
+    <key>NSMicrophoneUsageDescription</key>
+    <string>max_clawdroom listens for the wake phrase "hey Max" on-device. Audio never leaves your Mac.</string>
+
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>max_clawdroom uses on-device speech recognition so you can summon Max by voice.</string>
+
+    <!-- Accessibility permission (`AXIsProcessTrusted`) is not gated via
+         Info.plist — the user grants it in System Settings → Privacy &
+         Security → Accessibility. But the app MUST be signed with a
+         stable identity so TCC remembers the grant across updates.
+         See NOTARIZATION.md. -->
+
+    <key>LSApplicationCategoryType</key>
+    <string>public.app-category.utilities</string>
+
+    <!-- Sparkle auto-update. Appcast is hosted on the marketing site;
+         EdDSA public key is the one produced by Sparkle's generate_keys
+         tool. See RELEASE.md for how to (re)generate + inject it. The
+         private half stays in your keychain; never commit it. -->
+    <key>SUFeedURL</key>
+    <string>https://maxclawdroom.app/appcast.xml</string>
+
+    <!-- REPLACE with your actual EdDSA public key when you first run
+         `generate_keys`. Leaving the placeholder ships an app that
+         can't verify updates — which is fine for local testing but
+         MUST be set before the first public release. -->
+    <key>SUPublicEDKey</key>
+    <string>HY7mxlNidbvpKlCkQTbKxzjy41gFtUSLUQtUg6ltulo=</string>
+
+    <!-- Ask the user to allow automatic checks on first launch.
+         `SUEnableAutomaticChecks=true` opts them in by default; the
+         in-app Settings pane can flip it off. -->
+    <key>SUEnableAutomaticChecks</key>
+    <true/>
+    <key>SUScheduledCheckInterval</key>
+    <integer>86400</integer>
+</dict>
+</plist>

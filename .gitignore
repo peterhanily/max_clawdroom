@@ -1,0 +1,18 @@
+.build/
+.swiftpm/
+Package.resolved
+.DS_Store
+*.bak
+
+# Packaging output (signed .app + distributable zip)
+dist/
+
+# Local-only custom Forms (persona skins, proprietary meshes, etc.)
+Sources/Companion/Pet/Forms/Private/
+!Sources/Companion/Pet/Forms/Private/.gitkeep
+
+# Local assets (3D models, textures, reference images) — tracked dir, untracked contents
+Sources/Companion/Resources/*
+!Sources/Companion/Resources/.gitkeep
+
+Sources/Companion/Resources/Local/

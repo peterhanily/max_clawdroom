@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!--
+    Entitlements for max_clawdroom. Paired with codesign's runtime
+    option to enable the Hardened Runtime (required for notarization).
+
+    NOT sandboxed. The app reads other processes' UI via the
+    Accessibility API (EditorAwareness → kAXDocumentAttribute,
+    kAXSelectedTextRangeAttribute) which is explicitly incompatible
+    with the App Sandbox. Developer ID distribution permits this;
+    Mac App Store distribution would not.
+
+    HISTORICAL NOTE: earlier versions enabled `allow-jit`,
+    `allow-unsigned-executable-memory`, `disable-library-validation`,
+    and `allow-dyld-environment-variables` to support the MLX/Kokoro-82M
+    voice path. MLX was removed in 0.1.1; those entitlements have been
+    dropped. If you re-introduce a JIT'd shader / library-loaded
+    backend, re-add ONLY what that backend needs and document why.
+    -->
+
+    <!-- Network: claude-code CLI talks to Anthropic's API. We don't
+         open sockets ourselves today, but future agent actions
+         might (e.g. fetching documentation, URL previews). -->
+    <key>com.apple.security.network.client</key>
+    <true/>
+
+    <!-- Mic + speech recognition for the wake-on-voice slice and the
+         hold-to-talk hotkey. Paired with Info.plist usage descriptions. -->
+    <key>com.apple.security.device.audio-input</key>
+    <true/>
+
+    <!--
+    NOT requested:
+    - com.apple.security.app-sandbox (incompatible with AX reads)
+    - com.apple.security.cs.allow-jit (no JIT path now MLX is gone)
+    - com.apple.security.cs.allow-unsigned-executable-memory (ditto)
+    - com.apple.security.cs.disable-library-validation (no unsigned dylibs ship)
+    - com.apple.security.cs.allow-dyld-environment-variables (we strip
+      DYLD_* explicitly before launching the claude subprocess; see
+      ClaudeCodeProcess.start())
+    - com.apple.security.automation.apple-events (AX is its own TCC
+      bucket, granted separately by the user)
+    - com.apple.security.files.user-selected.read-write (state files
+      live under ~/Library/Application Support/Companion/ which a
+      non-sandboxed app can write to without a prompt)
+    -->
+</dict>
+</plist>

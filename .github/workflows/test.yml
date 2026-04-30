@@ -1,0 +1,30 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: swift test
+    # macOS 26 isn't a GitHub-hosted runner image yet; we run on the
+    # latest available (currently macOS 14 / Sonoma) which has the
+    # working Swift runtime. CompanionRuntimePatch's hooks no-op
+    # cleanly on this OS via the version check in install_runtime_hooks.
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: swift --version
+
+      - name: Build
+        run: swift build
+
+      - name: Run tests
+        run: swift test --enable-test-discovery

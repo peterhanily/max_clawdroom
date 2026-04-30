@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Sparkle appcast template. Each release adds a new <item> block.
+  See RELEASE.md for the per-release checklist that generates the
+  EdDSA signature + file length.
+-->
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+  <channel>
+    <title>max_clawdroom</title>
+    <link>https://maxclawdroom.app</link>
+    <description>Your desktop companion.</description>
+    <language>en</language>
+
+    <!--
+      Example item — replace placeholders with real values from the
+      release. __ED_SIGNATURE__ comes from Sparkle's sign_update tool;
+      __LENGTH__ is the DMG file size in bytes (stat -f%z file.dmg).
+    -->
+    <item>
+      <title>Version __VERSION__</title>
+      <sparkle:releaseNotesLink>https://maxclawdroom.app/releases/__VERSION__.html</sparkle:releaseNotesLink>
+      <pubDate>__PUBDATE__</pubDate>
+      <enclosure url="https://github.com/peterhanily/max_clawdroom/releases/download/v__VERSION__/max_clawdroom-__VERSION__.dmg"
+                 sparkle:version="__BUILD__"
+                 sparkle:shortVersionString="__VERSION__"
+                 sparkle:edSignature="__ED_SIGNATURE__"
+                 length="__LENGTH__"
+                 type="application/octet-stream"/>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+    </item>
+  </channel>
+</rss>
