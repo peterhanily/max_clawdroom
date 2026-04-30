@@ -34,9 +34,9 @@ cd "$ROOT"
 
 : "${DEVELOPER_ID_APPLICATION:?Set DEVELOPER_ID_APPLICATION env var — see tools/package.sh for details}"
 # App-scoped notary profile name. Each Mac app should have its own
-# keychain profile so a future MacCrab / other pipeline can't clobber
-# this one. Override with NOTARY_PROFILE=… if you've been using a
-# different name historically.
+# keychain profile so an unrelated pipeline on the same machine can't
+# clobber this one. Override with NOTARY_PROFILE=… if you've been using
+# a different name historically.
 NOTARY_PROFILE="${NOTARY_PROFILE:-notarytool-max_clawdroom}"
 
 # Refuse to ship a build whose Sparkle EdDSA key is still the placeholder.
