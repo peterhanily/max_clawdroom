@@ -12,7 +12,7 @@
 # the hash. See RELEASE.md for the full release checklist.
 cask "max_clawdroom" do
   version "0.2.0"
-  sha256 "0ec701934fba2c92ac9e8fb5d463340d270504d700d11836572253036243920f"
+  sha256 "60c7cdf7bc2ddc257738b189b99f299d9d9e99a04dc62dee4042ba2107581de1"
 
   url "https://github.com/peterhanily/max_clawdroom/releases/download/v#{version}/max_clawdroom-#{version}.dmg"
   name "max_clawdroom"
