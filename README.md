@@ -20,7 +20,7 @@
 ---
 
 > [!WARNING]
-> **Private alpha — v0.2.0.** Max is under active development and ships with rough edges. Expect bugs, breaking changes between minor versions, missing features, and the occasional hard crash. The action-op contract, channel wire format, on-disk memory schema, and Sparkle appcast are **not yet stable** and may change without migration paths until v1.0. Don't trust him with anything you can't afford to lose. If you find a bug, please [file an issue](https://github.com/peterhanily/max_clawdroom/issues/new).
+> **Public alpha — v0.2.0.** Max is under active development and ships with rough edges. Expect bugs, breaking changes between minor versions, missing features, and the occasional hard crash. The action-op contract, channel wire format, on-disk memory schema, and Sparkle appcast are **not yet stable** and may change without migration paths until v1.0. Don't trust him with anything you can't afford to lose. If you find a bug, please [file an issue](https://github.com/peterhanily/max_clawdroom/issues/new).
 
 ## What is Max?
 
