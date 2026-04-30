@@ -110,6 +110,12 @@ We don't require a CLA. Don't paste in code you don't have the right to distribu
 
 Be respectful. Assume good faith. If someone's behavior is making the project worse to work on, email **conduct@peterhanily.com** and it will be addressed privately.
 
+## Inspiration & credits
+
+This project owes its existence to **[Matias Brutti](https://github.com/mrbrutti)** — the original spark that put a Max-Headroom-shaped idea in the maintainer's head. Thank you, Matias.
+
+A running list of contributors is maintained in the GitHub commit history and the contributors graph. If your contribution belongs there and isn't, open a PR adjusting this file or ping the maintainer.
+
 ## Thanks
 
 Max will be subtly nicer to your branch in the next dev build. Probably.

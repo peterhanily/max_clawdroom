@@ -229,6 +229,7 @@ For security issues, do **not** file a public issue. See [SECURITY.md](SECURITY.
 
 ## Acknowledgements
 
+- **[Matias Brutti](https://github.com/mrbrutti)** — for the inspiration that started this project.
 - [Claude Code](https://www.anthropic.com/claude-code) — the backend Max runs on.
 - [Max Headroom (1985)](https://en.wikipedia.org/wiki/Max_Headroom) — the aesthetic.
 - [Sparkle](https://sparkle-project.org) — auto-update.
