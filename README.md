@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/images/max-standard.png" alt="Max — a Max-Headroom-style 3D companion living on your macOS desktop" width="640" />
+<img src="docs/images/max-standard.png" alt="Max — a Max-Headroom-style 3D companion living on your macOS desktop" width="320" />
 
 # max_clawdroom
 
@@ -39,15 +39,15 @@ He has access to per-cwd memory, the macOS Accessibility API (so he can read wha
 <table>
 <tr>
 <td align="center" width="33%">
-<img src="docs/images/max-standard.png" alt="Standard Max" width="280" /><br/>
+<img src="docs/images/max-standard.png" alt="Standard Max" width="180" /><br/>
 <sub><b>Standard</b><br/>The baseline broadcaster, suit and tie.</sub>
 </td>
 <td align="center" width="33%">
-<img src="docs/images/max-hacker.png" alt="L33t haxxor Max" width="280" /><br/>
+<img src="docs/images/max-hacker.png" alt="L33t haxxor Max" width="180" /><br/>
 <sub><b>L33t haxxor mode</b><br/>Black turtleneck, terminal-green prompt. <code>set_outfit_preset</code>.</sub>
 </td>
 <td align="center" width="33%">
-<img src="docs/images/max-shoggoth.png" alt="Shoggoth Max" width="280" /><br/>
+<img src="docs/images/max-shoggoth.png" alt="Shoggoth Max" width="180" /><br/>
 <sub><b>Shoggoth mode</b><br/>Smiling-emoji face, drifting orbs. <code>set_face_morph</code>.</sub>
 </td>
 </tr>
@@ -244,6 +244,6 @@ Copyright © 2026 Peter Hanily.
 ---
 
 <div align="center">
-<img src="docs/images/max-ireland.png" alt="Max in green, raising a pint" width="220" /><br/>
+<img src="docs/images/max-ireland.png" alt="Max in green, raising a pint" width="140" /><br/>
 <sub><i>Sláinte.</i></sub>
 </div>
