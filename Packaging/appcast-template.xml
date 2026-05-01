@@ -18,7 +18,7 @@
     -->
     <item>
       <title>Version __VERSION__</title>
-      <sparkle:releaseNotesLink>https://maxclawdroom.app/releases/__VERSION__.html</sparkle:releaseNotesLink>
+      <sparkle:releaseNotesLink>https://maxclawdroom.app/releases/__VERSION__</sparkle:releaseNotesLink>
       <pubDate>__PUBDATE__</pubDate>
       <enclosure url="https://github.com/peterhanily/max_clawdroom/releases/download/v__VERSION__/max_clawdroom-__VERSION__.dmg"
                  sparkle:version="__BUILD__"

@@ -6,6 +6,12 @@ Versioning follows [SemVer](https://semver.org). This is an alpha — expect bre
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-04-30
+
+First public release. GitHub repo public, Sparkle-signed DMG live on the
+[website](https://maxclawdroom.app), Apache 2.0 licensed. Everything below
+shipped between v0.1.0 (private) and today.
+
 ### Added — Channels (multi-host backend routing)
 - **`Channel` abstraction** — Max can attach to any OpenClaw / clawdex on demand. Three transport tiers: `.local` (loopback), `.lan` (Bonjour-paired with 6-digit code, ported from the TV companion), `.remote` (Tailscale / Cloudflare Tunnel / direct host:port + bearer). `.claudeCodeCLI` retains the legacy direct-subprocess path. All three OpenAI-SSE tiers share `OpenAIHTTPBackend` with per-channel URL + bearer.
 - **Menu bar Channels submenu** — kind glyphs (💻 / 📡 / ☁️ / ▶︎), ⌘1–⌘9 hotkeys, top-level title shows the active channel + a health badge (● live / ◐ slow / ○ unreachable / ✕ unauthorized). Settings → Channels gives a list with Make Active / Remove / Add Channel… (Local / LAN / Remote tabs, each with reachability test).
@@ -59,11 +65,6 @@ Versioning follows [SemVer](https://semver.org). This is an alpha — expect bre
 - Renamed all 11 `Companion`-prefixed types to `MaxClawdroom`-prefixed (`MaxClawdroomAction`, `MaxClawdroomContext`, `MaxClawdroomMode`, `MaxClawdroomState`, etc.). Cosmetic only — UserDefaults keys, file paths, Keychain accounts, Bonjour service type, SPM target name, and bundle resource name are untouched (would need a one-shot data migration to rename without losing user state).
 - System prompt updated to refer to the app as `max_clawdroom` (was "Companion").
 - Sound effects independent of voice mute by default — ⌥⌘V "Silence Max" still kills both via the menu handler, but per-feature Settings toggles work independently.
-
-### Security
-- **Soul-patch review-by-default + content filter**
-
-## [Unreleased — pre-channels]
 
 ### Security
 - **Soul-patch review-by-default + content filter** — `update_soul`/`propose_soul_patch` ops now ENQUEUE for user review (was: auto-apply). New `Prefs.soulAutoApply` (default off) restores the auto-apply path for users who explicitly want it. Both paths run a deny-list against ~25 prompt-injection / exfiltration phrases and a 30-patch-per-30-days monthly cap on top of the existing 3/hr rate limit. Rejected patches surface a chat-visible reason and post a system notification.

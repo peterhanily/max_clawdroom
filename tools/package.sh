@@ -278,6 +278,50 @@ echo "==> stapling ticket"
 xcrun stapler staple "${APP_PATH}"
 xcrun stapler validate "${APP_PATH}"
 
+# ───────────────────────────────────────────────── 5.5 Smoke-launch guard
+# Notary checks signatures, not "does the binary actually run." Six
+# packaging bugs slipped through to v0.2.0 because we trusted notary
+# Accepted → release. Run the binary briefly to confirm it gets past
+# dyld + AppDelegate startup before we cut artefacts.
+#
+# 3s is the heuristic: every launch crash family the wiki documents
+# (missing Sparkle.framework, missing rpath, codesign-rejected bundle,
+# macOS 26.x executor probe) trips during AppDelegate startup, well
+# under 1s. Survival to t=3s means dyld linked + the runtime patch
+# installed + AppDelegate.applicationDidFinishLaunching ran far enough
+# to stand up the menu bar without crashing.
+#
+# Override with SKIP_SMOKE=1 for builds where you intentionally need
+# to bypass (e.g. unsigned local builds tested via package.sh's
+# SKIP_NOTARIZE path that's already exited above this point — this
+# step is unreachable then but the override is here for completeness).
+if [ -z "${SKIP_SMOKE:-}" ]; then
+  echo "==> smoke-launching ${APP_PATH}"
+  EXE="${APP_PATH}/Contents/MacOS/${BINARY_NAME}"
+  SMOKE_LOG="$(mktemp)"
+  "${EXE}" >"${SMOKE_LOG}" 2>&1 &
+  SMOKE_PID=$!
+  sleep 3
+  if kill -0 "${SMOKE_PID}" 2>/dev/null; then
+    kill "${SMOKE_PID}" 2>/dev/null || true
+    wait "${SMOKE_PID}" 2>/dev/null || true
+    echo "==> smoke ok (process survived 3s)"
+    rm -f "${SMOKE_LOG}"
+  else
+    wait "${SMOKE_PID}" 2>/dev/null
+    SMOKE_EXIT=$?
+    echo "ERROR: ${EXE} exited within 3s (exit=${SMOKE_EXIT})." >&2
+    echo "       Means dyld, the runtime patch, or AppDelegate startup" >&2
+    echo "       failed. Last 50 lines of binary stderr:" >&2
+    echo "" >&2
+    tail -50 "${SMOKE_LOG}" >&2
+    echo "" >&2
+    echo "       Refusing to ship a broken bundle." >&2
+    rm -f "${SMOKE_LOG}"
+    exit 2
+  fi
+fi
+
 # ──────────────────────────────────────────────── 6. Distributable artefacts
 FINAL_ZIP="${DIST_DIR}/${BINARY_NAME}-${VERSION}.zip"
 rm -f "${FINAL_ZIP}"

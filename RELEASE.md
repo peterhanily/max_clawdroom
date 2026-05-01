@@ -65,7 +65,7 @@ Appcast XML template (`Packaging/appcast-template.xml`):
     <language>en</language>
     <item>
       <title>Version __VERSION__</title>
-      <sparkle:releaseNotesLink>https://maxclawdroom.app/releases/__VERSION__.html</sparkle:releaseNotesLink>
+      <sparkle:releaseNotesLink>https://maxclawdroom.app/releases/__VERSION__</sparkle:releaseNotesLink>
       <pubDate>__PUBDATE__</pubDate>
       <enclosure url="https://github.com/peterhanily/max_clawdroom/releases/download/v__VERSION__/max_clawdroom-__VERSION__.dmg"
                  sparkle:version="__BUILD__"
@@ -109,8 +109,13 @@ The cask's `zap trash:` block mirrors PRIVACY.md's "Data deletion" section so `b
 [ ] Update CHANGELOG.md with the new version's notes
 [ ] git tag v<VERSION> && git push --tags
 [ ] DEVELOPER_ID_APPLICATION="..." ./tools/package.sh
+[ ]   ↪ Verify the run printed "==> smoke ok (process survived 3s)"
+       (catches dyld / framework / executor-probe regressions that pass
+       notary but break at runtime; runs post-staple, before DMG build)
 [ ] Sparkle-sign the DMG:  sign_update dist/max_clawdroom-<version>.dmg
 [ ] Update appcast.xml with the new <item> + EdDSA signature + file length
+[ ]   ↪ Release-notes URL form is /releases/<VERSION> (no .html — Cloudflare
+       Pages strips it, the trailing-slash form would 307)
 [ ] Publish GitHub Release, attach .dmg and .zip
 [ ] Deploy updated appcast.xml to maxclawdroom.app
 [ ] Update the Homebrew tap's Casks/max_clawdroom.rb (version + sha256)
