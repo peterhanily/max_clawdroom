@@ -1,6 +1,47 @@
 import AppKit
 import SwiftUI
 
+/// Curated chat-chrome looks the user can pick during onboarding or from
+/// Settings → Character. Each case is a snapshot of the @Published
+/// `ChatTheme` fields applied via `ChatTheme.apply(_:)`. Agents can still
+/// override individual channels at runtime via `set_chat_color` after a
+/// preset is applied — preset is a starting point, not a lock.
+enum ChatThemePreset: String, CaseIterable, Codable {
+    /// CRT default — the look that shipped in v0.1.0. Equivalent to
+    /// `ChatTheme.resetToDefaults()`.
+    case classic
+    /// Light, low-contrast, system-rounded font. Reads like a sticky note.
+    case minimal
+    /// Pure mono on near-black, amber accents. Terminal vibe without
+    /// the magenta/cyan CRT washing.
+    case terminal
+    /// Comic-book — papyrus on cream with bold marker accents. Loud.
+    case comic
+
+    var displayName: String {
+        switch self {
+        case .classic:  return "Classic CRT"
+        case .minimal:  return "Minimal"
+        case .terminal: return "Terminal"
+        case .comic:    return "Comic"
+        }
+    }
+
+    /// Two swatches the picker UI can render without instantiating a
+    /// ChatTheme — first is the panel, second is the user-message accent.
+    var previewSwatches: (panel: Color, accent: Color) {
+        switch self {
+        case .classic:  return (CRTPalette.panel, CRTPalette.magenta)
+        case .minimal:  return (Color(red: 0.97, green: 0.97, blue: 0.96),
+                                Color(red: 0.20, green: 0.40, blue: 0.85))
+        case .terminal: return (Color(red: 0.05, green: 0.05, blue: 0.05),
+                                CRTPalette.amber)
+        case .comic:    return (Color(red: 0.99, green: 0.96, blue: 0.88),
+                                Color(red: 0.85, green: 0.20, blue: 0.30))
+        }
+    }
+}
+
 /// Fixed reference colours used as theme defaults and for elements that
 /// aren't agent-customisable (dim icon text, mod indicator glyph).
 enum CRTPalette {
@@ -204,5 +245,54 @@ final class ChatTheme: ObservableObject {
         case .input:     input = color
         case .send:      send = color
         }
+    }
+
+    /// Snap every channel to the named preset. Mirrors `resetToDefaults()`
+    /// in shape (assigns each @Published, runs the high-contrast override
+    /// last so accessibility users keep their palette) but lets the user
+    /// pick from a curated set. Agent's per-channel `set_chat_color`
+    /// overrides still work after the snap — preset is a starting point.
+    func apply(_ preset: ChatThemePreset) {
+        switch preset {
+        case .classic:
+            resetToDefaults()
+            return
+        case .minimal:
+            panel     = Color(red: 0.97, green: 0.97, blue: 0.96)
+            border    = Color(red: 0.78, green: 0.78, blue: 0.80)
+            text      = Color(red: 0.10, green: 0.10, blue: 0.12)
+            user      = Color(red: 0.20, green: 0.40, blue: 0.85)
+            assistant = Color(red: 0.30, green: 0.30, blue: 0.34)
+            prompt    = Color(red: 0.40, green: 0.40, blue: 0.45)
+            cursor    = Color(red: 0.10, green: 0.10, blue: 0.12)
+            input     = Color(red: 1.00, green: 1.00, blue: 1.00)
+            send      = Color(red: 0.20, green: 0.40, blue: 0.85)
+            fontFamily = .rounded
+        case .terminal:
+            panel     = Color(red: 0.05, green: 0.05, blue: 0.05)
+            border    = CRTPalette.amber
+            text      = Color(red: 0.92, green: 0.92, blue: 0.88)
+            user      = CRTPalette.amber
+            assistant = Color(red: 0.92, green: 0.92, blue: 0.88)
+            prompt    = CRTPalette.amber
+            cursor    = Color(red: 0.92, green: 0.92, blue: 0.88)
+            input     = Color(red: 0.02, green: 0.02, blue: 0.02)
+            send      = CRTPalette.amber
+            fontFamily = .menlo
+        case .comic:
+            panel     = Color(red: 0.99, green: 0.96, blue: 0.88)
+            border    = Color(red: 0.10, green: 0.10, blue: 0.12)
+            text      = Color(red: 0.10, green: 0.10, blue: 0.12)
+            user      = Color(red: 0.85, green: 0.20, blue: 0.30)
+            assistant = Color(red: 0.20, green: 0.30, blue: 0.65)
+            prompt    = Color(red: 0.85, green: 0.20, blue: 0.30)
+            cursor    = Color(red: 0.10, green: 0.10, blue: 0.12)
+            input     = Color(red: 1.00, green: 0.99, blue: 0.93)
+            send      = Color(red: 0.85, green: 0.20, blue: 0.30)
+            fontFamily = .comic
+        }
+        backgroundImageName = nil
+        backgroundImageOpacity = 0.6
+        applyHighContrastIfNeeded()
     }
 }

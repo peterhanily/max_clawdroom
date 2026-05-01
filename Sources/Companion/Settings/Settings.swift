@@ -1,5 +1,26 @@
 import Foundation
 
+/// Which curated character preset drives onboarding visuals + name.
+/// `.max` keeps the canonical look (broadcaster outfit, CRT chat theme,
+/// name "Max"). `.custom` defers to the values stored in
+/// `BackendSettings.customCharacter` — set during onboarding's character
+/// step or from Settings.
+enum CharacterPreset: String, Codable, CaseIterable {
+    case max
+    case custom
+}
+
+/// User-authored character spec used when `characterPreset == .custom`.
+/// `outfitPresetId` references an `OutfitPreset.rawValue`;
+/// `chatThemePresetId` references a `ChatThemePreset.rawValue`. Stored
+/// as raw strings (not enum values) so future presets can be added
+/// without breaking the decode of older saves.
+struct CustomCharacter: Codable, Equatable {
+    var name: String
+    var outfitPresetId: String
+    var chatThemePresetId: String
+}
+
 /// Which agent backend drives conversations.
 /// - `.claudeCode`: long-lived `claude` CLI subprocess (default)
 /// - `.openAIHTTP`: HTTP streaming against any `/v1/chat/completions`
@@ -30,7 +51,10 @@ struct BackendSettings: Codable, Equatable {
     /// migrations that want a hook in `SettingsStore.init`. The
     /// UserDefaults key bump (v2 → v3) is reserved for changes that
     /// would make older decodes silently produce wrong data.
-    static let currentSchemaVersion: Int = 1
+    /// v2 — adds `characterPreset` + `customCharacter`. Older saves
+    /// decode with `.max` and `nil` respectively, which is byte-identical
+    /// behaviour for everyone who installed before the picker shipped.
+    static let currentSchemaVersion: Int = 2
     var schemaVersion: Int
     /// Absolute path to the `claude` CLI executable. Auto-detected on first
     /// launch via `which claude`; editable in Settings.
@@ -62,6 +86,15 @@ struct BackendSettings: Codable, Equatable {
     /// through into the system prompt or voice output.
     var companionName: String
 
+    /// Selected character preset. `.max` is the default and matches
+    /// pre-picker behaviour; `.custom` defers visual + name choices to
+    /// `customCharacter`. Written by the onboarding character step and
+    /// the Settings → Character row.
+    var characterPreset: CharacterPreset
+    /// Custom name + outfit + chat theme triple. Only consulted when
+    /// `characterPreset == .custom`. `nil` for `.max` users.
+    var customCharacter: CustomCharacter?
+
     /// Which backend drives chat. Defaults to the Claude Code CLI
     /// subprocess that shipped in v0.1.0; `.openAIHTTP` routes to the
     /// HTTP fields below instead.
@@ -88,6 +121,8 @@ struct BackendSettings: Codable, Equatable {
         model: "",
         systemPrompt: "",
         companionName: "Max",
+        characterPreset: .max,
+        customCharacter: nil,
         backendType: .claudeCode,
         openAIBaseURL: Constants.Clawdex.chatCompletionsURL,
         openAIApiKey: "",
@@ -117,6 +152,7 @@ struct BackendSettings: Codable, Equatable {
         case schemaVersion
         case claudeBinaryPath, cwd, permissionMode, allowedTools, model, systemPrompt
         case companionName
+        case characterPreset, customCharacter
         case backendType, openAIBaseURL, openAIApiKey, openAIModel
     }
     init(
@@ -128,6 +164,8 @@ struct BackendSettings: Codable, Equatable {
         model: String,
         systemPrompt: String,
         companionName: String = "Max",
+        characterPreset: CharacterPreset = .max,
+        customCharacter: CustomCharacter? = nil,
         backendType: AgentBackendType = .claudeCode,
         openAIBaseURL: String = Constants.Clawdex.chatCompletionsURL,
         openAIApiKey: String = "",
@@ -141,6 +179,8 @@ struct BackendSettings: Codable, Equatable {
         self.model = model
         self.systemPrompt = systemPrompt
         self.companionName = companionName
+        self.characterPreset = characterPreset
+        self.customCharacter = customCharacter
         self.backendType = backendType
         self.openAIBaseURL = openAIBaseURL
         self.openAIApiKey = openAIApiKey
@@ -172,6 +212,10 @@ struct BackendSettings: Codable, Equatable {
         // Older saves won't have this; fall back to the canonical default
         // so existing installs feel continuous.
         self.companionName = (try? c.decode(String.self, forKey: .companionName)) ?? "Max"
+        // Pre-v2 saves: land on .max with no custom data, which preserves
+        // exactly the behaviour the user had before the picker existed.
+        self.characterPreset = (try? c.decode(CharacterPreset.self, forKey: .characterPreset)) ?? .max
+        self.customCharacter = try? c.decode(CustomCharacter.self, forKey: .customCharacter)
     }
 
     /// Custom encode so the API key never lands in UserDefaults. The
@@ -191,5 +235,7 @@ struct BackendSettings: Codable, Equatable {
         try c.encode("",               forKey: .openAIApiKey)  // Keychain holds the secret
         try c.encode(openAIModel,      forKey: .openAIModel)
         try c.encode(companionName,    forKey: .companionName)
+        try c.encode(characterPreset,  forKey: .characterPreset)
+        try c.encodeIfPresent(customCharacter, forKey: .customCharacter)
     }
 }

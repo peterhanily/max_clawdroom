@@ -192,6 +192,41 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         mouseTracker = MouseTracker(overlays: overlayControllers)
         mouseTracker?.start()
 
+        // Character-picker apply: the onboarding step + Settings row
+        // post `companionAppliedCharacter` after writing the chosen
+        // values to BackendSettings. Forward the visual half of the
+        // change here — outfit goes to every overlay's Pet, theme goes
+        // to the shared ChatTheme. The name write is already in
+        // `BackendSettings.companionName`; display surfaces re-read it
+        // through MaxClawdroomIdentity on the next frame.
+        NotificationCenter.default.addObserver(
+            forName: .companionAppliedCharacter,
+            object: nil,
+            queue: .main
+        ) { [weak self] note in
+            // The observer closure is nonisolated, but Pet.applyOutfit
+            // and ChatTheme.apply are MainActor-isolated. Pull the
+            // String values out here (Sendable) so the userInfo dict
+            // itself never crosses the actor hop, then schedule the
+            // apply on the main actor.
+            let info = note.userInfo ?? [:]
+            let outfitId = info[CompanionAppliedCharacterKey.outfit] as? String
+            let themeId  = info[CompanionAppliedCharacterKey.theme]  as? String
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                if let outfitId,
+                   let outfit = OutfitPreset(rawValue: outfitId) {
+                    for controller in self.overlayControllers {
+                        _ = controller.pet.applyOutfit(outfit)
+                    }
+                }
+                if let themeId,
+                   let theme = ChatThemePreset(rawValue: themeId) {
+                    sharedChatTheme.apply(theme)
+                }
+            }
+        }
+
         // Agent lifecycle — wake / survey / plan / work / idle / sleep
         // loop on top of the existing autonomy controller. Opt-in; when
         // off, nothing here runs. Binds to the primary overlay's session

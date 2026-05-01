@@ -6,11 +6,12 @@ struct OnboardingView: View {
     var onDone: () -> Void
 
     @State private var step: Int = 0
-    /// 5 steps: welcome → connect → permissions → soul → tour-prompt.
-    /// Flow chosen so the user lands with: a name set, a working
-    /// channel, accessibility granted (or knowingly skipped), and
-    /// a moment to opt into the tour.
-    private let totalSteps = 5
+    /// 6 steps: welcome → character → connect → permissions → soul → tour-prompt.
+    /// Welcome still does the name rename (kept for users who want
+    /// the simplest path); character lets them pick Max / Custom /
+    /// 🎲 with outfit + chat theme. Choosing a custom character
+    /// overwrites the welcome-page name field on commit.
+    private let totalSteps = 6
 
     var body: some View {
         VStack(spacing: 0) {
@@ -53,10 +54,74 @@ struct OnboardingView: View {
     private var content: some View {
         switch step {
         case 0: welcomePage
-        case 1: connectPage
-        case 2: permissionsPage
-        case 3: soulPage
+        case 1: characterPage
+        case 2: connectPage
+        case 3: permissionsPage
+        case 4: soulPage
         default: tourPage
+        }
+    }
+
+    private var characterPage: some View {
+        CharacterPickerView(
+            initial: currentPickedCharacter()
+        ) { picked in
+            commitCharacter(picked)
+        }
+    }
+
+    private func currentPickedCharacter() -> PickedCharacter {
+        if store.settings.characterPreset == .custom,
+           let c = store.settings.customCharacter,
+           let outfit = OutfitPreset(rawValue: c.outfitPresetId),
+           let theme = ChatThemePreset(rawValue: c.chatThemePresetId) {
+            return .custom(RolledCharacter(
+                name: c.name,
+                outfitPreset: outfit,
+                chatThemePreset: theme
+            ))
+        }
+        return .max
+    }
+
+    /// Writes the picked character into settings + posts the apply
+    /// notification. AppDelegate observes and propagates to the live
+    /// Pet + ChatTheme. Doesn't auto-advance the step — the user still
+    /// hits Next.
+    private func commitCharacter(_ picked: PickedCharacter) {
+        switch picked {
+        case .max:
+            store.settings.characterPreset = .max
+            store.settings.customCharacter = nil
+            store.settings.companionName = "Max"
+            NotificationCenter.default.post(
+                name: .companionAppliedCharacter,
+                object: nil,
+                userInfo: [
+                    CompanionAppliedCharacterKey.name:   "Max",
+                    CompanionAppliedCharacterKey.outfit: OutfitPreset.broadcaster.rawValue,
+                    CompanionAppliedCharacterKey.theme:  ChatThemePreset.classic.rawValue
+                ]
+            )
+        case .custom(let c):
+            let safeName = MaxClawdroomIdentity.sanitise(c.name.isEmpty ? "Max" : c.name)
+            let custom = CustomCharacter(
+                name: safeName,
+                outfitPresetId: c.outfitPreset.rawValue,
+                chatThemePresetId: c.chatThemePreset.rawValue
+            )
+            store.settings.characterPreset = .custom
+            store.settings.customCharacter = custom
+            store.settings.companionName = safeName
+            NotificationCenter.default.post(
+                name: .companionAppliedCharacter,
+                object: nil,
+                userInfo: [
+                    CompanionAppliedCharacterKey.name:   safeName,
+                    CompanionAppliedCharacterKey.outfit: c.outfitPreset.rawValue,
+                    CompanionAppliedCharacterKey.theme:  c.chatThemePreset.rawValue
+                ]
+            )
         }
     }
 
