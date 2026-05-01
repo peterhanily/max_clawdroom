@@ -75,12 +75,14 @@ enum MaxClawdroomIdentity {
         var cleaned = ""
         cleaned.reserveCapacity(input.count)
         for ch in input {
-            // Drop ASCII control chars + Unicode C0/C1 controls
-            // outright — they don't belong in a display name.
-            for scalar in ch.unicodeScalars {
-                if scalar.value < 0x20 || (scalar.value >= 0x7F && scalar.value < 0xA0) {
-                    continue
-                }
+            // Drop any character containing an ASCII control or Unicode
+            // C0/C1 control scalar — they don't belong in a display name.
+            // The previous shape used a nested `for scalar` + `continue`
+            // which only skipped the inner scalar loop, leaving the
+            // character to fall through and append. Use `contains(where:)`
+            // so the skip applies to the outer character loop.
+            if ch.unicodeScalars.contains(where: { $0.value < 0x20 || ($0.value >= 0x7F && $0.value < 0xA0) }) {
+                continue
             }
             if disallowed.contains(ch) { continue }
             cleaned.append(ch)
