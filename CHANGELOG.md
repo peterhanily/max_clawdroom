@@ -6,11 +6,22 @@ Versioning follows [SemVer](https://semver.org). This is an alpha — expect bre
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-05-01
+
 ### Added — Character picker
 - **Onboarding character step** — new step between welcome and connect. Two cards (`Max` / `Custom…`) plus an `🎲 I'm feeling lucky` button. Lucky rolls a name + outfit + chat-theme triple in place; the user can roll repeatedly before committing via "Keep this one" or tweaking via "Customize…". Custom sub-sheet exposes name field, full `OutfitPreset` dropdown (25 cases), and a new `ChatThemePreset` dropdown (4 cases).
 - **`ChatThemePreset` enum** — `classic` (CRT default — byte-identical to `ChatTheme.resetToDefaults()`), `minimal`, `terminal`, `comic`. Snapping a preset reassigns every `@Published` channel on `ChatTheme` and re-runs the high-contrast accessibility override; agent's per-channel `set_chat_color` overrides still work after the snap.
 - **Settings → Character row** — same `Max` / `Custom` / `🎲` picker mirrored into General tab so the choice is reversible post-onboarding.
-- **`BackendSettings` schema v2** — adds `characterPreset` + optional `customCharacter`. Pre-v2 saves decode with `.max` and `nil` (no behaviour change for existing installs). Apply path posts `companionAppliedCharacter`; `AppDelegate` forwards outfit to every overlay's `Pet` and theme to the shared `ChatTheme`.
+- **`BackendSettings` schema v2** — adds `characterPreset` + optional `customCharacter`. Pre-v2 saves decode with `.max` and `nil` (no behaviour change for existing installs). Apply path lives on `SettingsStore.applyCharacter(_:)` (one shared mutator for both onboarding + Settings), which posts `companionAppliedCharacter`; `AppDelegate` forwards outfit to every overlay's `Pet` and theme to the shared `ChatTheme`.
+
+### Added — Release tooling
+- **Post-notary smoke-launch guard in `tools/package.sh`** — runs the freshly-stapled binary for 3s before building artefacts. Catches dyld / framework / runtime-patch regressions that pass notary but crash on launch. Six such bugs slipped through to v0.2.0; this gate prevents the next class of them. `SKIP_SMOKE=1` to override.
+
+### Changed
+- **Appcast release-notes URL** — drops `.html` (`releases/<VERSION>` instead of `releases/<VERSION>.html`). Cloudflare Pages serves the same content; the trailing form 307'd.
+
+### Fixed
+- **`MaxClawdroomIdentity.sanitise`** — the C0/C1 control-character strip used a nested `for scalar in ch.unicodeScalars { … continue }` whose `continue` only skipped the inner scalar loop, leaving the character to fall through and append. Replaced with `unicodeScalars.contains(where:)` so the skip applies to the outer character loop. Not exploitable (the explicit disallowed-char Set already filtered CR/LF/TAB), but the dead branch was misleading.
 
 ## [0.2.0] — 2026-04-30
 
