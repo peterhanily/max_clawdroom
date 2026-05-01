@@ -1,21 +1,14 @@
 import AppKit
 import SwiftUI
 
-/// Curated chat-chrome looks the user can pick during onboarding or from
-/// Settings → Character. Each case is a snapshot of the @Published
-/// `ChatTheme` fields applied via `ChatTheme.apply(_:)`. Agents can still
-/// override individual channels at runtime via `set_chat_color` after a
-/// preset is applied — preset is a starting point, not a lock.
+/// Curated starting points for the chat chrome. Apply via
+/// `ChatTheme.apply(_:)`. Agents can still override individual channels
+/// at runtime via `set_chat_color` after a preset is applied — preset
+/// is a starting point, not a lock.
 enum ChatThemePreset: String, CaseIterable, Codable {
-    /// CRT default — the look that shipped in v0.1.0. Equivalent to
-    /// `ChatTheme.resetToDefaults()`.
     case classic
-    /// Light, low-contrast, system-rounded font. Reads like a sticky note.
     case minimal
-    /// Pure mono on near-black, amber accents. Terminal vibe without
-    /// the magenta/cyan CRT washing.
     case terminal
-    /// Comic-book — papyrus on cream with bold marker accents. Loud.
     case comic
 
     var displayName: String {
@@ -247,11 +240,9 @@ final class ChatTheme: ObservableObject {
         }
     }
 
-    /// Snap every channel to the named preset. Mirrors `resetToDefaults()`
-    /// in shape (assigns each @Published, runs the high-contrast override
-    /// last so accessibility users keep their palette) but lets the user
-    /// pick from a curated set. Agent's per-channel `set_chat_color`
-    /// overrides still work after the snap — preset is a starting point.
+    /// Mirrors the shape of `resetToDefaults()` — assigns every
+    /// @Published, then re-runs the high-contrast override last so
+    /// accessibility users don't lose their palette to a preset apply.
     func apply(_ preset: ChatThemePreset) {
         switch preset {
         case .classic:

@@ -63,65 +63,8 @@ struct OnboardingView: View {
     }
 
     private var characterPage: some View {
-        CharacterPickerView(
-            initial: currentPickedCharacter()
-        ) { picked in
-            commitCharacter(picked)
-        }
-    }
-
-    private func currentPickedCharacter() -> PickedCharacter {
-        if store.settings.characterPreset == .custom,
-           let c = store.settings.customCharacter,
-           let outfit = OutfitPreset(rawValue: c.outfitPresetId),
-           let theme = ChatThemePreset(rawValue: c.chatThemePresetId) {
-            return .custom(RolledCharacter(
-                name: c.name,
-                outfitPreset: outfit,
-                chatThemePreset: theme
-            ))
-        }
-        return .max
-    }
-
-    /// Writes the picked character into settings + posts the apply
-    /// notification. AppDelegate observes and propagates to the live
-    /// Pet + ChatTheme. Doesn't auto-advance the step — the user still
-    /// hits Next.
-    private func commitCharacter(_ picked: PickedCharacter) {
-        switch picked {
-        case .max:
-            store.settings.characterPreset = .max
-            store.settings.customCharacter = nil
-            store.settings.companionName = "Max"
-            NotificationCenter.default.post(
-                name: .companionAppliedCharacter,
-                object: nil,
-                userInfo: [
-                    CompanionAppliedCharacterKey.name:   "Max",
-                    CompanionAppliedCharacterKey.outfit: OutfitPreset.broadcaster.rawValue,
-                    CompanionAppliedCharacterKey.theme:  ChatThemePreset.classic.rawValue
-                ]
-            )
-        case .custom(let c):
-            let safeName = MaxClawdroomIdentity.sanitise(c.name.isEmpty ? "Max" : c.name)
-            let custom = CustomCharacter(
-                name: safeName,
-                outfitPresetId: c.outfitPreset.rawValue,
-                chatThemePresetId: c.chatThemePreset.rawValue
-            )
-            store.settings.characterPreset = .custom
-            store.settings.customCharacter = custom
-            store.settings.companionName = safeName
-            NotificationCenter.default.post(
-                name: .companionAppliedCharacter,
-                object: nil,
-                userInfo: [
-                    CompanionAppliedCharacterKey.name:   safeName,
-                    CompanionAppliedCharacterKey.outfit: c.outfitPreset.rawValue,
-                    CompanionAppliedCharacterKey.theme:  c.chatThemePreset.rawValue
-                ]
-            )
+        CharacterPickerView(initial: store.settings.pickedCharacter) { picked in
+            store.applyCharacter(picked)
         }
     }
 

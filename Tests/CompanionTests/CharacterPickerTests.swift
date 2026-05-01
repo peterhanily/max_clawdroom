@@ -81,17 +81,6 @@ final class CharacterPickerTests: XCTestCase {
         XCTAssertEqual(decoded.companionName, "Max")
     }
 
-    func test_custom_character_round_trips() throws {
-        let original = CustomCharacter(
-            name: "Nova",
-            outfitPresetId: OutfitPreset.astronaut.rawValue,
-            chatThemePresetId: ChatThemePreset.terminal.rawValue
-        )
-        let data = try JSONEncoder().encode(original)
-        let decoded = try JSONDecoder().decode(CustomCharacter.self, from: data)
-        XCTAssertEqual(decoded, original)
-    }
-
     func test_v2_settings_round_trip_preserves_custom_character() throws {
         var settings = BackendSettings.default
         settings.characterPreset = .custom

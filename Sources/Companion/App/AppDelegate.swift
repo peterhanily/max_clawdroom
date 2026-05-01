@@ -192,13 +192,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         mouseTracker = MouseTracker(overlays: overlayControllers)
         mouseTracker?.start()
 
-        // Character-picker apply: the onboarding step + Settings row
-        // post `companionAppliedCharacter` after writing the chosen
-        // values to BackendSettings. Forward the visual half of the
-        // change here — outfit goes to every overlay's Pet, theme goes
-        // to the shared ChatTheme. The name write is already in
-        // `BackendSettings.companionName`; display surfaces re-read it
-        // through MaxClawdroomIdentity on the next frame.
+        // Forward the visual half of an applied character to every
+        // overlay's Pet and the shared ChatTheme. Name lives in
+        // `BackendSettings.companionName`; display surfaces re-read it.
         NotificationCenter.default.addObserver(
             forName: .companionAppliedCharacter,
             object: nil,

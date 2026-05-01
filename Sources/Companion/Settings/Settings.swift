@@ -51,9 +51,6 @@ struct BackendSettings: Codable, Equatable {
     /// migrations that want a hook in `SettingsStore.init`. The
     /// UserDefaults key bump (v2 → v3) is reserved for changes that
     /// would make older decodes silently produce wrong data.
-    /// v2 — adds `characterPreset` + `customCharacter`. Older saves
-    /// decode with `.max` and `nil` respectively, which is byte-identical
-    /// behaviour for everyone who installed before the picker shipped.
     static let currentSchemaVersion: Int = 2
     var schemaVersion: Int
     /// Absolute path to the `claude` CLI executable. Auto-detected on first

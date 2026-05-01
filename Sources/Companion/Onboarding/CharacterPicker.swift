@@ -1,21 +1,13 @@
 import SwiftUI
 import AppKit
 
-/// Output of the lucky roller. Kept as a plain value type so tests can
-/// assert on it without spinning up a SwiftUI view.
 struct RolledCharacter: Equatable {
     var name: String
     var outfitPreset: OutfitPreset
     var chatThemePreset: ChatThemePreset
 }
 
-/// Pure functions that draw a random `RolledCharacter`. Lives in its own
-/// type so tests can pass a deterministic `RandomNumberGenerator` and
-/// assert the distribution.
 enum LuckyRoller {
-    /// Curated 30-name pool, mixed across feminine / masculine / neutral
-    /// / nicknames. Hand-picked to be playful and to avoid anything that
-    /// reads like an existing AI-product brand.
     static let namePool: [String] = [
         "Nova", "Rex", "Pixel", "Juno", "Echo", "Zephyr", "Mango",
         "Iris", "Atlas", "Sable", "Wren", "Orion", "Luna", "Bandit",
@@ -31,43 +23,94 @@ enum LuckyRoller {
         return RolledCharacter(name: name, outfitPreset: outfit, chatThemePreset: theme)
     }
 
-    /// Convenience wrapper for the UI — rolls with the system RNG.
     static func roll() -> RolledCharacter {
         var rng = SystemRandomNumberGenerator()
         return roll(using: &rng)
     }
 }
 
-/// Choice the picker has settled on. Mirrors `BackendSettings`'
-/// `characterPreset` + `customCharacter` shape but keeps the picker
-/// view self-contained — the parent commits the result to settings.
 enum PickedCharacter: Equatable {
     case max
     case custom(RolledCharacter)
+
+    var asCustom: RolledCharacter? {
+        if case .custom(let c) = self { return c }
+        return nil
+    }
 }
 
-/// Reusable picker UI used by the onboarding character step and the
-/// Settings → Character row. Two big cards (Max / Custom) plus the
-/// lucky button. Lucky updates the in-place preview without committing
-/// — the user has to hit "Keep this one" to confirm.
+extension BackendSettings {
+    /// Reconstruct a `PickedCharacter` from the stored fields. Falls back
+    /// to `.max` if a `.custom` save references an outfit or theme id
+    /// that the current build no longer ships — failing soft beats
+    /// crashing the picker on a future preset rename.
+    var pickedCharacter: PickedCharacter {
+        guard characterPreset == .custom,
+              let c = customCharacter,
+              let outfit = OutfitPreset(rawValue: c.outfitPresetId),
+              let theme = ChatThemePreset(rawValue: c.chatThemePresetId)
+        else { return .max }
+        return .custom(RolledCharacter(
+            name: c.name,
+            outfitPreset: outfit,
+            chatThemePreset: theme
+        ))
+    }
+}
+
+extension SettingsStore {
+    /// Single commit path used by both the onboarding character step
+    /// and the Settings → Character row: write the picked values into
+    /// `BackendSettings`, then post `companionAppliedCharacter` so
+    /// AppDelegate can propagate the visual half to the live Pet +
+    /// ChatTheme. Mutator owns the notification (matches the Prefs.swift
+    /// convention — see `companionVoiceChanged` / `companionAccessibilityChanged`).
+    func applyCharacter(_ picked: PickedCharacter) {
+        let resolvedName: String
+        let outfitId: String
+        let themeId: String
+        switch picked {
+        case .max:
+            resolvedName = "Max"
+            outfitId = OutfitPreset.broadcaster.rawValue
+            themeId  = ChatThemePreset.classic.rawValue
+            settings.characterPreset = .max
+            settings.customCharacter = nil
+        case .custom(let c):
+            resolvedName = MaxClawdroomIdentity.sanitise(c.name.isEmpty ? "Max" : c.name)
+            outfitId = c.outfitPreset.rawValue
+            themeId  = c.chatThemePreset.rawValue
+            settings.characterPreset = .custom
+            settings.customCharacter = CustomCharacter(
+                name: resolvedName,
+                outfitPresetId: outfitId,
+                chatThemePresetId: themeId
+            )
+        }
+        settings.companionName = resolvedName
+        NotificationCenter.default.post(
+            name: .companionAppliedCharacter,
+            object: nil,
+            userInfo: [
+                CompanionAppliedCharacterKey.name:   resolvedName,
+                CompanionAppliedCharacterKey.outfit: outfitId,
+                CompanionAppliedCharacterKey.theme:  themeId
+            ]
+        )
+    }
+}
+
 struct CharacterPickerView: View {
-    /// Initial value when the view appears.
     let initial: PickedCharacter
-    /// Called when the user commits — onboarding writes settings + posts
-    /// the apply notification; settings does the same.
     let onCommit: (PickedCharacter) -> Void
 
     @State private var picked: PickedCharacter
-    @State private var rolled: RolledCharacter?
     @State private var showingCustomSheet: Bool = false
 
     init(initial: PickedCharacter, onCommit: @escaping (PickedCharacter) -> Void) {
         self.initial = initial
         self.onCommit = onCommit
         _picked = State(initialValue: initial)
-        if case .custom(let c) = initial {
-            _rolled = State(initialValue: c)
-        }
     }
 
     var body: some View {
@@ -82,19 +125,19 @@ struct CharacterPickerView: View {
                 presetCard(
                     title: "Max",
                     subtitle: "broadcaster outfit, CRT chat",
-                    selected: isMaxSelected,
+                    selected: picked.asCustom == nil,
                     swatches: (panel: ChatThemePreset.classic.previewSwatches.panel,
                                accent: ChatThemePreset.classic.previewSwatches.accent)
                 ) {
                     picked = .max
-                    rolled = nil
+                    onCommit(.max)
                 }
 
                 presetCard(
                     title: "Custom…",
                     subtitle: "your name + look",
-                    selected: isCustomSelected,
-                    swatches: rolled.map {
+                    selected: picked.asCustom != nil,
+                    swatches: picked.asCustom.map {
                         ($0.chatThemePreset.previewSwatches.panel,
                          $0.chatThemePreset.previewSwatches.accent)
                     } ?? (Color.secondary.opacity(0.15), Color.orange)
@@ -104,11 +147,9 @@ struct CharacterPickerView: View {
             }
 
             Button {
-                let r = LuckyRoller.roll()
-                rolled = r
-                picked = .custom(r)
+                picked = .custom(LuckyRoller.roll())
             } label: {
-                Label(rolled == nil
+                Label(picked.asCustom == nil
                       ? "I'm feeling lucky"
                       : "Roll again",
                       systemImage: "die.face.5")
@@ -116,40 +157,25 @@ struct CharacterPickerView: View {
             .buttonStyle(.bordered)
             .controlSize(.regular)
 
-            if case .custom(let c) = picked {
-                rollPreview(c)
+            if let custom = picked.asCustom {
+                rollPreview(custom)
             }
 
             Spacer(minLength: 0)
         }
         .sheet(isPresented: $showingCustomSheet) {
             CustomCharacterSheet(
-                seed: rolled ?? RolledCharacter(
+                seed: picked.asCustom ?? RolledCharacter(
                     name: "Max",
                     outfitPreset: .broadcaster,
                     chatThemePreset: .classic
                 )
             ) { final in
-                rolled = final
                 picked = .custom(final)
                 showingCustomSheet = false
                 onCommit(.custom(final))
             }
         }
-        .onChange(of: picked) { _, new in
-            // .max commits immediately; .custom commits via sheet "Use
-            // this" or "Keep this one" lucky-confirm. The lucky button
-            // alone doesn't commit — user can keep rolling.
-            if case .max = new { onCommit(.max) }
-        }
-    }
-
-    private var isMaxSelected: Bool {
-        if case .max = picked { return true } else { return false }
-    }
-
-    private var isCustomSelected: Bool {
-        if case .custom = picked { return true } else { return false }
     }
 
     @ViewBuilder
@@ -219,10 +245,6 @@ struct CharacterPickerView: View {
     }
 }
 
-/// Sub-sheet opened from the picker. Lets the user tweak the rolled
-/// values directly — name, outfit dropdown, theme dropdown — and
-/// commit. Pre-fills with whatever the picker handed in (either the
-/// last roll, or a Max-shaped seed).
 struct CustomCharacterSheet: View {
     let seed: RolledCharacter
     let onUse: (RolledCharacter) -> Void
@@ -295,18 +317,13 @@ struct CustomCharacterSheet: View {
 }
 
 extension Notification.Name {
-    /// Posted whenever the user commits a character choice from the
-    /// onboarding picker or Settings. UserInfo carries:
-    ///   - `companionName: String`
-    ///   - `outfitPresetId: String`  (rawValue of OutfitPreset)
-    ///   - `chatThemePresetId: String` (rawValue of ChatThemePreset)
-    /// AppDelegate observes and routes to every overlay's Pet +
-    /// the shared ChatTheme; the `companionName` write is mirrored
-    /// into `BackendSettings` by the picker itself.
+    /// Posted by `SettingsStore.applyCharacter`. UserInfo carries the
+    /// three String values listed in `CompanionAppliedCharacterKey`.
+    /// AppDelegate observes and routes to every overlay's Pet + the
+    /// shared ChatTheme; the name write is already in BackendSettings.
     static let companionAppliedCharacter = Notification.Name("companion.character.applied")
 }
 
-/// User-info keys for `.companionAppliedCharacter`.
 enum CompanionAppliedCharacterKey {
     static let name   = "companionName"
     static let outfit = "outfitPresetId"

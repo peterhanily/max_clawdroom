@@ -194,10 +194,8 @@ struct SettingsView: View {
                 }
 
                 section(title: "Character", icon: "theatermasks") {
-                    CharacterPickerView(
-                        initial: settingsPickedCharacter()
-                    ) { picked in
-                        commitSettingsCharacter(picked)
+                    CharacterPickerView(initial: store.settings.pickedCharacter) { picked in
+                        store.applyCharacter(picked)
                     }
                 }
 
@@ -462,64 +460,6 @@ struct SettingsView: View {
     }
 
     // MARK: - Actions
-
-    /// Read current character pick out of settings for the picker's
-    /// `initial` value. Falls back to `.max` if the saved custom character
-    /// references a preset id that no longer exists (e.g. an outfit was
-    /// renamed) — failing soft is better than crashing the panel.
-    private func settingsPickedCharacter() -> PickedCharacter {
-        if store.settings.characterPreset == .custom,
-           let c = store.settings.customCharacter,
-           let outfit = OutfitPreset(rawValue: c.outfitPresetId),
-           let theme = ChatThemePreset(rawValue: c.chatThemePresetId) {
-            return .custom(RolledCharacter(
-                name: c.name,
-                outfitPreset: outfit,
-                chatThemePreset: theme
-            ))
-        }
-        return .max
-    }
-
-    /// Same shape as the onboarding commit — write to settings, post the
-    /// apply notification so AppDelegate updates the live Pet + ChatTheme.
-    /// Duplicated from OnboardingView intentionally; a shared helper would
-    /// pull both views into the same module-level seam for ~12 saved lines.
-    private func commitSettingsCharacter(_ picked: PickedCharacter) {
-        switch picked {
-        case .max:
-            store.settings.characterPreset = .max
-            store.settings.customCharacter = nil
-            store.settings.companionName = "Max"
-            NotificationCenter.default.post(
-                name: .companionAppliedCharacter,
-                object: nil,
-                userInfo: [
-                    CompanionAppliedCharacterKey.name:   "Max",
-                    CompanionAppliedCharacterKey.outfit: OutfitPreset.broadcaster.rawValue,
-                    CompanionAppliedCharacterKey.theme:  ChatThemePreset.classic.rawValue
-                ]
-            )
-        case .custom(let c):
-            let safeName = MaxClawdroomIdentity.sanitise(c.name.isEmpty ? "Max" : c.name)
-            store.settings.characterPreset = .custom
-            store.settings.customCharacter = CustomCharacter(
-                name: safeName,
-                outfitPresetId: c.outfitPreset.rawValue,
-                chatThemePresetId: c.chatThemePreset.rawValue
-            )
-            store.settings.companionName = safeName
-            NotificationCenter.default.post(
-                name: .companionAppliedCharacter,
-                object: nil,
-                userInfo: [
-                    CompanionAppliedCharacterKey.name:   safeName,
-                    CompanionAppliedCharacterKey.outfit: c.outfitPreset.rawValue,
-                    CompanionAppliedCharacterKey.theme:  c.chatThemePreset.rawValue
-                ]
-            )
-        }
-    }
 
     private func chooseCwd() {
         let panel = NSOpenPanel()
