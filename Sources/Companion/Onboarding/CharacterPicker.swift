@@ -147,7 +147,9 @@ struct CharacterPickerView: View {
             }
 
             Button {
-                picked = .custom(LuckyRoller.roll())
+                let rolled = LuckyRoller.roll()
+                picked = .custom(rolled)
+                onCommit(.custom(rolled))
             } label: {
                 Label(picked.asCustom == nil
                       ? "I'm feeling lucky"
@@ -169,7 +171,11 @@ struct CharacterPickerView: View {
                     name: "Max",
                     outfitPreset: .broadcaster,
                     chatThemePreset: .classic
-                )
+                ),
+                onPreview: { rolled in
+                    picked = .custom(rolled)
+                    onCommit(.custom(rolled))
+                }
             ) { final in
                 picked = .custom(final)
                 showingCustomSheet = false
@@ -247,6 +253,7 @@ struct CharacterPickerView: View {
 
 struct CustomCharacterSheet: View {
     let seed: RolledCharacter
+    let onPreview: (RolledCharacter) -> Void
     let onUse: (RolledCharacter) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -254,12 +261,25 @@ struct CustomCharacterSheet: View {
     @State private var outfit: OutfitPreset
     @State private var theme: ChatThemePreset
 
-    init(seed: RolledCharacter, onUse: @escaping (RolledCharacter) -> Void) {
+    init(
+        seed: RolledCharacter,
+        onPreview: @escaping (RolledCharacter) -> Void,
+        onUse: @escaping (RolledCharacter) -> Void
+    ) {
         self.seed = seed
+        self.onPreview = onPreview
         self.onUse = onUse
         _name = State(initialValue: seed.name)
         _outfit = State(initialValue: seed.outfitPreset)
         _theme = State(initialValue: seed.chatThemePreset)
+    }
+
+    private var current: RolledCharacter {
+        RolledCharacter(
+            name: name.isEmpty ? "Max" : name,
+            outfitPreset: outfit,
+            chatThemePreset: theme
+        )
     }
 
     var body: some View {
@@ -313,6 +333,8 @@ struct CustomCharacterSheet: View {
         }
         .padding(20)
         .frame(width: 360)
+        .onChange(of: outfit) { _, _ in onPreview(current) }
+        .onChange(of: theme)  { _, _ in onPreview(current) }
     }
 }
 

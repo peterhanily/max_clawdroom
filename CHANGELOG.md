@@ -6,6 +6,12 @@ Versioning follows [SemVer](https://semver.org). This is an alpha — expect bre
 
 ## [Unreleased]
 
+## [0.3.1] — 2026-05-02
+
+### Fixed
+- **Character picker now live-previews on the actual overlay.** The 🎲 dice button mutated only the picker's local state — it never called `onCommit`, so the on-screen Max never reflected a roll, and clicking "Next" before "Keep this one" silently discarded it. Same shape inside the Custom… sheet: dropdown changes didn't propagate to the live Pet. The dice button now commits each roll, and `CustomCharacterSheet` fires a new `onPreview` callback on every outfit / chat-look change so the live Pet + ChatTheme update as you tweak. Name field still commits only on dismiss (per-keystroke would thrash UserDefaults and there's no visible re-render mid-type).
+- **Sparkle signature account.** The keychain has two `https://sparkle-project.org` entries — a default `ed25519` account and the `max_clawdroom` account whose pubkey matches `Info.plist`'s `SUPublicEDKey`. Without `--account max_clawdroom`, `sign_update` silently picks the wrong key and Sparkle rejects the update with "improperly signed". `RELEASE.md` checklist now spells the flag out.
+
 ## [0.3.0] — 2026-05-01
 
 ### Added — Character picker
