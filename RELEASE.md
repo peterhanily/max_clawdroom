@@ -112,7 +112,14 @@ The cask's `zap trash:` block mirrors PRIVACY.md's "Data deletion" section so `b
 [ ]   ↪ Verify the run printed "==> smoke ok (process survived 3s)"
        (catches dyld / framework / executor-probe regressions that pass
        notary but break at runtime; runs post-staple, before DMG build)
-[ ] Sparkle-sign the DMG:  sign_update dist/max_clawdroom-<version>.dmg
+[ ] Sparkle-sign the DMG:  sign_update --account max_clawdroom dist/max_clawdroom-<version>.dmg
+      ↪ The --account flag is REQUIRED. The keychain has a default
+        `ed25519` entry from an earlier `generate_keys` run whose
+        public key does NOT match Info.plist's SUPublicEDKey. Without
+        --account, sign_update silently uses the wrong key and Sparkle
+        rejects the update with "improperly signed". Verify with:
+          sign_update --account max_clawdroom --verify <dmg> "<sig>"
+        (exit 0 = good).
 [ ] Update appcast.xml with the new <item> + EdDSA signature + file length
 [ ]   ↪ Release-notes URL form is /releases/<VERSION> (no .html — Cloudflare
        Pages strips it, the trailing-slash form would 307)
