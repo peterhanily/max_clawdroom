@@ -1,0 +1,24 @@
+{
+  "originHash" : "0f8d00d63e93e8fc619ec49031d6559ea5fa9675430b1679a85be8c625f9dafa",
+  "pins" : [
+    {
+      "identity" : "gltfscenekit",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/magicien/GLTFSceneKit.git",
+      "state" : {
+        "revision" : "a9587ec5c6515ee7d036533fdd909815a9a718ef",
+        "version" : "0.4.1"
+      }
+    },
+    {
+      "identity" : "sparkle",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/sparkle-project/Sparkle.git",
+      "state" : {
+        "revision" : "066e75a8b3e99962685d6a90cdd5293ebffd9261",
+        "version" : "2.9.1"
+      }
+    }
+  ],
+  "version" : 3
+}

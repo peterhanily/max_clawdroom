@@ -18,7 +18,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        # Pinned to commit SHA (v4.2.2). Updating: visit
+        # https://github.com/actions/checkout/releases, copy the new
+        # tag's commit SHA, paste here.
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
       - name: Show toolchain
         run: swift --version
