@@ -111,6 +111,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // observers attach before the first user interaction. Was per-
         // overlay; harmless to call once at app scope instead.
         PreferenceLearner.shared.start()
+        // Action audit ledger — observes the companionAgentAction
+        // broadcast that CompanionActions.dispatch already emits, so it
+        // attaches passively before the first chat session streams.
+        // Surfaces as Settings → Privacy → Action history.
+        ActionAuditLog.shared.start()
 
         // Stage-2 of the overlay refactor (docs/overlay-refactor.md):
         // hoist ChatSession to be a single shared instance. The biggest

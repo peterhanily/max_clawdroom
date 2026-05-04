@@ -156,6 +156,9 @@ struct SettingsView: View {
 
                 behaviourTab
                     .tabItem { Label("Behaviour", systemImage: "sparkle") }
+
+                PrivacyTab()
+                    .tabItem { Label("Privacy", systemImage: "lock.shield") }
             }
             .padding(.horizontal, 12)
             .padding(.bottom, 8)

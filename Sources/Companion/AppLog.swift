@@ -34,4 +34,5 @@ nonisolated enum AppLog {
     static let pet        = Logger(subsystem: subsystem, category: "pet")
     static let keychain   = Logger(subsystem: subsystem, category: "keychain")
     static let audio      = Logger(subsystem: subsystem, category: "audio")
+    static let actions    = Logger(subsystem: subsystem, category: "actions")
 }
