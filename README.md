@@ -20,7 +20,7 @@
 ---
 
 > [!WARNING]
-> **Public alpha — v0.2.0.** Max is under active development and ships with rough edges. Expect bugs, breaking changes between minor versions, missing features, and the occasional hard crash. The action-op contract, channel wire format, on-disk memory schema, and Sparkle appcast are **not yet stable** and may change without migration paths until v1.0. Don't trust him with anything you can't afford to lose. If you find a bug, please [file an issue](https://github.com/peterhanily/max_clawdroom/issues/new).
+> **Public alpha — v0.3.1.** Max is under active development and ships with rough edges. Expect bugs, breaking changes between minor versions, missing features, and the occasional hard crash. The action-op contract, channel wire format, on-disk memory schema, and Sparkle appcast are **not yet stable** and may change without migration paths until v1.0. Don't trust him with anything you can't afford to lose. If you find a bug, please [file an issue](https://github.com/peterhanily/max_clawdroom/issues/new).
 
 ## What is Max?
 
@@ -214,7 +214,7 @@ Max is local-first by design.
 - The default channel is local loopback (`http://127.0.0.1:52429`) — `claude` running on your own machine.
 - LAN channels use Bonjour discovery + a per-pair shared key; LAN traffic stays on your subnet.
 - Remote channels (Tailscale, Cloudflare Tunnel, raw HTTPS) are explicitly opt-in and the credential lives in your login Keychain.
-- No telemetry, no analytics, no crash reporting in v0.2. See [`docs/TELEMETRY_DECISION.md`](docs/TELEMETRY_DECISION.md) for the design that will land in v1.0 — it will be opt-in, default-off, with a payload preview before send.
+- No telemetry, no analytics, no crash reporting in 0.x. See [`docs/TELEMETRY_DECISION.md`](docs/TELEMETRY_DECISION.md) for the design that will land in v1.0 — it will be opt-in, default-off, with a payload preview before send.
 
 Full details: [PRIVACY.md](PRIVACY.md).
 

@@ -84,6 +84,20 @@ VERSION="$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" Packag
 RELEASE_BUILD_PATH="/private/tmp/maxclawdroom-release-build"
 BUILD_DIR="${RELEASE_BUILD_PATH}/arm64-apple-macosx/${BUILD_CONFIG}"
 
+# ────────────────────────────────────── 0. Release manifest check
+# Fails fast if Info.plist / CHANGELOG / cask / site / appcast / GitHub
+# release tag / Sparkle sig disagree. Cheap (~1s); catches the
+# version-drift class of bugs that produced the v0.3.0 signing miss.
+# SKIP_RELEASE_CHECK=1 skips for ad-hoc local builds.
+if [ -z "${SKIP_RELEASE_CHECK:-}" ]; then
+  echo "==> validating release manifest"
+  if ! "${ROOT}/tools/check-release.sh"; then
+    echo "release manifest check failed; aborting before build" >&2
+    echo "(SKIP_RELEASE_CHECK=1 to override for local-only builds)" >&2
+    exit 1
+  fi
+fi
+
 # ───────────────────────────────────────────────────────────── 1. Build
 if [ -z "${SKIP_BUILD:-}" ]; then
   # Wipe any prior contents so a previous user/branch's build
