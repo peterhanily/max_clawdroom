@@ -44,6 +44,36 @@ final class SoulPatchQueue {
         case rejectedRateLimit(perHour: Int)
         case rejectedMonthlyCap(perMonth: Int)
         case rejectedDenyPattern(matched: String)
+        /// Combined `priorPrompt + patch` would exceed `soulCharCap`.
+        /// Per-patch cap is already 4,000 chars; this catches the
+        /// slow-drift case where many small accepted patches push the
+        /// cumulative system prompt past the legibility / token budget
+        /// the user can reasonably keep in their head.
+        case rejectedSoulCap(wouldBe: Int, cap: Int)
+    }
+
+    /// Hard ceiling on the assembled system prompt. Roughly 8k tokens —
+    /// well under any modern context window, but big enough to give Max
+    /// a real personality budget. Beyond this the soul stops being a
+    /// "soul" and starts being a backdoor for storing arbitrary text.
+    /// Kept small because the user has to be able to read the assembled
+    /// soul in the editor and keep it in mind when reviewing patches.
+    static let soulCharCap = 32_000
+
+    /// Pure cap-check helper. Returns the projected post-apply length
+    /// AND whether it would exceed the cap. Used by both the immediate-
+    /// apply and queue-enqueue paths so the rejection point is identical
+    /// and surfaces the same numbers to the user. Exposed (internal) so
+    /// `SoulPatchQueueTests` can pin the arithmetic without hammering
+    /// the singleton + disk path.
+    static func wouldExceedSoulCap(
+        priorPrompt: String,
+        patch: String,
+        cap: Int = soulCharCap
+    ) -> (exceeded: Bool, projected: Int) {
+        let prior = priorPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        let projected = prior.count + (prior.isEmpty ? 0 : 2) + patch.count
+        return (projected > cap, projected)
     }
 
     /// Apply a soul patch directly. Snapshots prior state to SoulHistory
@@ -111,6 +141,18 @@ final class SoulPatchQueue {
         if recentMonth >= 30 {
             AppLog.soul.warning("monthly cap hit: \(recentMonth) patches in last 30d")
             return (.rejectedMonthlyCap(perMonth: recentMonth), false)
+        }
+
+        // Cumulative soul-size cap. Per-patch is already 4k; this is the
+        // backstop that prevents many small accepted patches from drifting
+        // the assembled soul into "small novel" territory.
+        let capCheck = Self.wouldExceedSoulCap(
+            priorPrompt: SettingsStore.shared.settings.systemPrompt,
+            patch: trimmedPatch
+        )
+        if capCheck.exceeded {
+            AppLog.soul.warning("soul cap hit: \(capCheck.projected) > \(Self.soulCharCap)")
+            return (.rejectedSoulCap(wouldBe: capCheck.projected, cap: Self.soulCharCap), false)
         }
 
         var snap = SettingsStore.shared.settings
@@ -241,6 +283,17 @@ final class SoulPatchQueue {
         if recentMonth >= 30 {
             AppLog.soul.warning("monthly cap hit (queue path): \(recentMonth)")
             return .rejectedMonthlyCap(perMonth: recentMonth)
+        }
+        // Cumulative soul-size cap, same as the apply path. Reject at
+        // enqueue time so the user isn't asked to approve a patch that
+        // would only fail the cap on apply.
+        let capCheck = Self.wouldExceedSoulCap(
+            priorPrompt: SettingsStore.shared.settings.systemPrompt,
+            patch: trimmedPatch
+        )
+        if capCheck.exceeded {
+            AppLog.soul.warning("soul cap hit (queue path): \(capCheck.projected) > \(Self.soulCharCap)")
+            return .rejectedSoulCap(wouldBe: capCheck.projected, cap: Self.soulCharCap)
         }
         // Hard cap on queue size even within rate limit, in case the user
         // hasn't opened the review window in days.

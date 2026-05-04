@@ -926,6 +926,8 @@ enum ActionDispatcher {
                 ctx.chatSession?.errorMessage = "Max's soul change was rate-limited (\(perHour) in the last hour)."
             case .rejectedMonthlyCap(let perMonth):
                 ctx.chatSession?.errorMessage = "Max's soul change was rejected — monthly cap reached (\(perMonth) in 30 days)."
+            case .rejectedSoulCap(let wouldBe, let cap):
+                ctx.chatSession?.errorMessage = "Max's soul change was rejected — soul would exceed its size cap (\(wouldBe.formatted()) / \(cap.formatted()) chars). Trim or revert older patches in Max's Soul."
             }
 
         case "write_journal":
