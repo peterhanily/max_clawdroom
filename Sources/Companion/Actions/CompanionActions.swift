@@ -256,6 +256,21 @@ enum ActionDispatcher {
     }
 
     static func dispatch(_ action: MaxClawdroomAction, in ctx: MaxClawdroomContext) {
+        // Schema-first validation runs before anything else. Ops without
+        // a registered schema return `.skipped` and dispatch proceeds as
+        // before; failures (unknown key / missing required / wrong type)
+        // surface to the chat session and log without firing the action.
+        // The audit-log notification is intentionally NOT posted on
+        // rejection — failed actions don't belong in "what Max did".
+        switch ActionInputValidator.validate(action) {
+        case .skipped, .ok:
+            break
+        case .failure(let reason):
+            AppLog.actions.warning("rejected action \(action.op, privacy: .public): \(reason, privacy: .public)")
+            ctx.chatSession?.errorMessage = "Max's `\(action.op)` action was rejected — \(reason)."
+            return
+        }
+
         let pet = ctx.pet
         let engine = ctx.bindingEngine
         let undo = ctx.undoStack
