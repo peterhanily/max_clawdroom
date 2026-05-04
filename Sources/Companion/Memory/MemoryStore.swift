@@ -37,6 +37,13 @@ final class MemoryStore {
     @ObservationIgnored private let fileURL: URL
     @ObservationIgnored private let encoder: JSONEncoder
     @ObservationIgnored private let decoder: JSONDecoder
+    /// AES-GCM key for at-rest encryption of `entries.jsonl`. nil only
+    /// when Keychain is locked / inaccessible at init — the read and
+    /// write paths fall back to plaintext with `0o600` perms in that
+    /// case (matching the SessionStore pattern). Mirrors the
+    /// `atRestKey` caching SessionStore does so we don't hit Keychain
+    /// on every rewrite. The key never leaves this process.
+    @ObservationIgnored private let atRestKey: SymmetricKey?
     /// Serial queue for disk writes. Keeps `remember` / `write_journal`
     /// off the main thread — a chatty agent emitting 10+ memory ops per
     /// turn used to hitch the UI while each entry flushed synchronously.
@@ -63,6 +70,10 @@ final class MemoryStore {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         self.decoder = decoder
+
+        self.atRestKey = KeychainStore.loadOrCreateSymmetricKey(
+            account: KeychainStore.atRestKeyAccount
+        )
 
         self.fileURL = Self.locate(cwd: cwd)
         loadFromDisk()
@@ -100,9 +111,28 @@ final class MemoryStore {
     // MARK: - Load / save
 
     private func loadFromDisk() {
-        guard let data = try? Data(contentsOf: fileURL),
-              let text = String(data: data, encoding: .utf8)
-        else { return }
+        guard let blob = try? Data(contentsOf: fileURL) else { return }
+
+        // Resolve the on-disk bytes to JSONL plaintext. With a key, try
+        // the encrypted envelope first; on failure (or no key), fall
+        // back to legacy plaintext bytes. `tolerantLoadData` returns nil
+        // only when the file LOOKS like a corrupted envelope — better
+        // to refuse than feed envelope JSON to the JSONL parser.
+        let data: Data
+        if let key = atRestKey {
+            guard let result = EncryptedJSONStore.tolerantLoadData(blob, using: key) else {
+                AppLog.memory.error("\(self.fileURL.lastPathComponent, privacy: .public) looks like a corrupted envelope; refusing to parse as JSONL")
+                return
+            }
+            data = result.value
+            if result.wasPlaintext {
+                AppLog.memory.notice("\(self.fileURL.lastPathComponent, privacy: .public) is legacy plaintext; will re-save sealed on next write")
+            }
+        } else {
+            data = blob
+        }
+
+        guard let text = String(data: data, encoding: .utf8) else { return }
         var skipped = 0
         for line in text.split(separator: "\n", omittingEmptySubsequences: true) {
             guard let d = line.data(using: .utf8) else { continue }
@@ -139,7 +169,9 @@ final class MemoryStore {
     }
 
     /// Rewrite the whole file from the in-memory array. Used by remove.
-    /// Encode inline, write in the background.
+    /// Encode inline, seal under `atRestKey` if available (legacy
+    /// plaintext callers / locked-Keychain installs fall through to
+    /// raw JSONL with 0o600). Disk write hops to `writeQueue`.
     private func rewriteDisk() {
         var buffer = Data()
         for entry in entries {
@@ -147,10 +179,25 @@ final class MemoryStore {
             buffer.append(d)
             buffer.append(0x0A)
         }
-        // Promote `buffer` to a `let` so the closure captures an
-        // immutable value — Swift 6 strict concurrency otherwise warns
-        // about a `var` flowing across a concurrent boundary.
-        let payload = buffer
+        let plaintext = buffer
+
+        // Seal under the at-rest key when we have one. On encrypt
+        // failure, fall back to plaintext rather than dropping the
+        // write — the user still gets owner-only file perms and the
+        // SessionStore precedent treats this as the safe degradation
+        // path. Logged loudly so the failure is visible in Console.
+        let payload: Data
+        if let key = atRestKey {
+            do {
+                payload = try EncryptedJSONStore.sealData(plaintext, using: key)
+            } catch {
+                AppLog.memory.error("seal failed for \(self.fileURL.lastPathComponent, privacy: .public); writing plaintext: \(error.localizedDescription, privacy: .public)")
+                payload = plaintext
+            }
+        } else {
+            payload = plaintext
+        }
+
         let url = fileURL
         writeQueue.async {
             do {

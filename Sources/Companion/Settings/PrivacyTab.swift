@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import CryptoKit
 
 /// Settings → Privacy. Two trust-visibility surfaces in one tab:
 ///
@@ -32,6 +33,8 @@ struct PrivacyTab: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
+                atRestEncryptionSection
+                Divider()
                 whatMaxSeesSection
                 Divider()
                 actionHistorySection
@@ -47,6 +50,39 @@ struct PrivacyTab: View {
             // get the panel to re-evaluate without coupling to a new
             // notification.
             sensitiveTickKey &+= 1
+        }
+    }
+
+    // MARK: - At-rest encryption status
+
+    private var atRestEncryptionSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionHeader("At-rest encryption", systemImage: "lock.doc")
+
+            let keyAvailable = KeychainStore
+                .loadOrCreateSymmetricKey(account: KeychainStore.atRestKeyAccount) != nil
+
+            if keyAvailable {
+                statusBadge(
+                    "Active — AES-GCM via login Keychain",
+                    tint: .green,
+                    systemImage: "checkmark.shield"
+                )
+                Text("Chat sessions, per-project memory, the user model, time capsules, and the action audit log are sealed on disk with a key only this app can read. The on-disk bytes are envelope JSON, not the contents.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                statusBadge(
+                    "Degraded — Keychain unavailable",
+                    tint: .orange,
+                    systemImage: "exclamationmark.shield"
+                )
+                Text("The app couldn't read or create its at-rest encryption key. Files are still saved with owner-only file permissions, but they're not encrypted while this state persists. Unlock your login Keychain (or restart the app after unlocking) to re-engage encryption.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 

@@ -6,6 +6,16 @@ Versioning follows [SemVer](https://semver.org). This is an alpha — expect bre
 
 ## [Unreleased]
 
+### Added — At-rest encryption parity (Wave C of trust polish)
+- **`MemoryStore` (`memory/<hash>/entries.jsonl`)** is now AES-GCM encrypted at rest, using the same Keychain-backed `companion.at_rest_aes_key` already used by `SessionStore`, `UserModelStore`, and `TimeCapsuleStore`. Lazy migration on first read: `tolerantLoadData` pulls bytes through the encrypted envelope first, falls back to legacy plaintext if the file pre-dates this build, and the next `rewriteDisk` re-saves sealed.
+- **`ActionAuditLog` (`actions/audit.jsonl`)** wired through the same path so the new ledger doesn't ship as the only plaintext store.
+- **`EncryptedJSONStore.sealData` / `openData` / `tolerantLoadData`** — raw-byte API so line-oriented stores (JSONL) can use the same envelope format as the existing Codable-value variant. Uses the same versioned envelope (`v=1`, 12B nonce, ciphertext, 16B tag) so future cipher rotations need only one dispatch table.
+- **Plaintext fallback if Keychain is locked** — both stores log `at-rest key unavailable; writing plaintext` once and continue with `0o600` perms rather than dropping the write. Same posture as `SessionStore` precedent.
+- **Tests** — 7 new cases in `EncryptedJSONStoreTests`: round-trip, tampered ciphertext rejection, wrong-key rejection, empty-input round-trip, tolerantLoad encrypted/legacy/unopenable triple. Suite is now 48/48 green (was 41).
+
+### Changed
+- **`PRIVACY.md` and site FAQ** corrected: chat sessions, memory, user model, time capsules, and the action audit log are all AES-GCM encrypted at rest. The earlier "only user model + time capsules are encrypted" wording was inaccurate (sessions had been encrypted since their introduction; memory + audit log were the actual gap and now match).
+
 ## [0.3.1] — 2026-05-02
 
 ### Fixed

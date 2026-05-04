@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import CryptoKit
 
 /// Append-only ledger of every action op the agent dispatched. Lets the
 /// user see what Max actually did — memory writes, soul proposals, media
@@ -30,6 +31,11 @@ final class ActionAuditLog: ObservableObject {
     private let decoder: JSONDecoder
     private let entryCap = 5_000
     private var observer: NSObjectProtocol?
+    /// AES-GCM key for at-rest encryption of `audit.jsonl`. Same key
+    /// account as MemoryStore / SessionStore — one at-rest key per
+    /// install, multiple stores share it. nil on Keychain miss; the
+    /// read/write paths fall back to plaintext + 0o600 in that case.
+    private let atRestKey: SymmetricKey?
 
     private lazy var fileURL: URL = {
         let base = FileManager.default
@@ -48,6 +54,7 @@ final class ActionAuditLog: ObservableObject {
         let d = JSONDecoder()
         d.dateDecodingStrategy = .iso8601
         decoder = d
+        atRestKey = KeychainStore.loadOrCreateSymmetricKey(account: KeychainStore.atRestKeyAccount)
         loadFromDisk()
     }
 
@@ -98,8 +105,27 @@ final class ActionAuditLog: ObservableObject {
 
     private func loadFromDisk() {
         guard FileManager.default.fileExists(atPath: fileURL.path),
-              let data = try? Data(contentsOf: fileURL)
+              let blob = try? Data(contentsOf: fileURL)
         else { return }
+
+        // Resolve to JSONL plaintext bytes — encrypted envelope first
+        // (with key), legacy plaintext fallback. Same shape as
+        // MemoryStore.loadFromDisk; the abstraction lives in
+        // EncryptedJSONStore.tolerantLoadData.
+        let data: Data
+        if let key = atRestKey {
+            guard let result = EncryptedJSONStore.tolerantLoadData(blob, using: key) else {
+                AppLog.actions.error("audit.jsonl looks like a corrupted envelope; refusing to parse")
+                return
+            }
+            data = result.value
+            if result.wasPlaintext {
+                AppLog.actions.notice("audit.jsonl is legacy plaintext; will re-save sealed on next write")
+            }
+        } else {
+            data = blob
+        }
+
         var loaded: [ActionAuditEntry] = []
         for line in data.split(separator: 0x0A) where !line.isEmpty {
             if let entry = try? decoder.decode(ActionAuditEntry.self, from: Data(line)) {
@@ -116,7 +142,23 @@ final class ActionAuditLog: ObservableObject {
             buffer.append(d)
             buffer.append(0x0A)
         }
-        let payload = buffer
+        let plaintext = buffer
+
+        // Seal under the at-rest key when present; plaintext-fallback
+        // on encrypt failure (logged) or no-Keychain — same posture as
+        // MemoryStore / SessionStore.
+        let payload: Data
+        if let key = atRestKey {
+            do {
+                payload = try EncryptedJSONStore.sealData(plaintext, using: key)
+            } catch {
+                AppLog.actions.error("seal failed for audit.jsonl; writing plaintext: \(error.localizedDescription, privacy: .public)")
+                payload = plaintext
+            }
+        } else {
+            payload = plaintext
+        }
+
         let url = fileURL
         writeQueue.async {
             do {

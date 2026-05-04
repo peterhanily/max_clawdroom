@@ -20,10 +20,13 @@ All persistent state lives under:
 ~/Library/Application Support/Companion/
 ```
 
-- **Chat sessions** (`sessions/*.json`) — your conversations, per project (cwd). Grow with use; delete the directory to wipe.
-- **Memory** (`memory/<hash>/entries.jsonl`) — one per project, append-only. Contains observations the agent recorded about your preferences, projects, and recent topics. The directory hash obscures the project name on disk.
-- **User model** (`memory/<hash>/user_model.json`) — a distilled, structured summary of the above. **Encrypted at rest** using AES-GCM with a key held in your macOS Keychain; the file on disk is ciphertext.
-- **Time capsules** (`memory/<hash>/time_capsules.json`) — periodic (~90-day) snapshots of the user model + companion personality. Encrypted the same way.
+All files below carry **owner-only file permissions (`0o600`)** and are AES-GCM encrypted at rest with a key held in your macOS Keychain (service `com.peterhanily.max_clawdroom`, account `companion.at_rest_aes_key`). The on-disk bytes are an envelope of `{v, nonce, ciphertext, tag}`; nothing readable by `cat`. If the Keychain is locked at write time the app degrades to plaintext-with-`0o600` and logs a notice — Settings → Privacy surfaces this state.
+
+- **Chat sessions** (`sessions/*.json`) — your conversations, per project (cwd). Grow with use; delete the directory to wipe. **Encrypted at rest.**
+- **Memory** (`memory/<hash>/entries.jsonl`) — one per project, append-only. Contains observations the agent recorded about your preferences, projects, and recent topics. The directory hash obscures the project name on disk. **Encrypted at rest.**
+- **User model** (`memory/<hash>/user_model.json`) — a distilled, structured summary of the above. **Encrypted at rest.**
+- **Time capsules** (`memory/<hash>/time_capsules.json`) — periodic (~90-day) snapshots of the user model + companion personality. **Encrypted at rest.**
+- **Action audit log** (`actions/audit.jsonl`) — every action op the agent dispatched, browsable from Settings → Privacy. **Encrypted at rest.**
 - **Soul history** (`soul_history.json`) — a log of personality patches the companion has applied to itself, with timestamps and rationales. Plain JSON.
 - **Preferences** (`UserDefaults` at `com.peterhanily.max_clawdroom`) — app settings (backend choice, voice on/off, mode, etc.).
 

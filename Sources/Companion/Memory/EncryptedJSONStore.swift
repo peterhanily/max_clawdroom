@@ -109,6 +109,79 @@ enum EncryptedJSONStore {
         }
         return nil
     }
+
+    // MARK: - Raw byte API (for line-oriented stores)
+
+    /// Seal arbitrary bytes into the same envelope format. Used by
+    /// stores whose on-disk representation isn't a single Codable value
+    /// — e.g. JSONL ledgers (memory, action audit log) where the
+    /// natural unit is line-separated bytes, not one struct.
+    ///
+    /// The envelope shape is identical to the Codable variant above, so
+    /// the version byte and decryption path stay shared.
+    static func sealData(
+        _ plain: Data,
+        using key: SymmetricKey
+    ) throws -> Data {
+        let sealed = try AES.GCM.seal(plain, using: key)
+        let envelope = Envelope(
+            v: currentVersion,
+            nonce: Data(sealed.nonce),
+            ciphertext: sealed.ciphertext,
+            tag: sealed.tag
+        )
+        return try JSONEncoder.shared.encode(envelope)
+    }
+
+    /// Open a sealed-bytes envelope. Symmetrical with `sealData`.
+    /// Throws on version mismatch, malformed envelope, or auth-tag
+    /// failure (latter is the canary for a tampered file).
+    static func openData(
+        _ envelopeData: Data,
+        using key: SymmetricKey
+    ) throws -> Data {
+        let envelope = try JSONDecoder.shared.decode(Envelope.self, from: envelopeData)
+        guard envelope.v == currentVersion else {
+            throw EncryptedStoreError.unsupportedVersion(envelope.v)
+        }
+        let nonce = try AES.GCM.Nonce(data: envelope.nonce)
+        let box = try AES.GCM.SealedBox(
+            nonce: nonce,
+            ciphertext: envelope.ciphertext,
+            tag: envelope.tag
+        )
+        return try AES.GCM.open(box, using: key)
+    }
+
+    /// Tolerantly load file contents as raw bytes. Tries the encrypted
+    /// envelope first; if decoding/decrypting fails, returns the input
+    /// as-is and flags `wasPlaintext = true`. Callers use that flag to
+    /// trigger a migrate-on-next-write — same shape as the Codable
+    /// `tolerantLoad`. Returns nil only if both forms fail (which for
+    /// the byte-level API means the envelope failed AND the input is
+    /// empty / unreadable; arbitrary bytes are always a "valid"
+    /// plaintext).
+    static func tolerantLoadData(
+        _ blob: Data,
+        using key: SymmetricKey
+    ) -> LoadResult<Data>? {
+        if let plain = try? openData(blob, using: key) {
+            return LoadResult(value: plain, wasPlaintext: false)
+        }
+        // openData failed. Discriminate "envelope-shaped but
+        // un-openable" (corruption / wrong key / version skew) from
+        // "not an envelope at all" (legacy plaintext) by attempting
+        // just the structural decode. Legacy JSONL has no `nonce` /
+        // `ciphertext` / `tag` keys so the Envelope decode will fail
+        // and we route to plaintext. A tampered envelope still decodes
+        // structurally (the JSON shell is intact) but couldn't be
+        // opened — those we surface as nil so the caller refuses
+        // rather than feeding envelope JSON to a JSONL parser.
+        if (try? JSONDecoder.shared.decode(Envelope.self, from: blob)) != nil {
+            return nil
+        }
+        return LoadResult(value: blob, wasPlaintext: true)
+    }
 }
 
 // MARK: - Errors
