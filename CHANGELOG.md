@@ -6,6 +6,14 @@ Versioning follows [SemVer](https://semver.org). This is an alpha — expect bre
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-05-05
+
+The trust-polish release. Eight waves (A–H) addressing the v0.3.1 audit's findings: docs / version sync, Settings → Privacy panel with What-Max-Sees + Action audit log, at-rest AES-GCM encryption parity for memory + audit log (joining sessions / user-model / time-capsules), pending-proposal review UI for soul patches with a 32k cumulative cap, schema-first action validation for the highest-stakes durable ops, runtime-patch tracking docs, multi-monitor AX coord refactor, and 68 new tests (41 → 109).
+
+This is the SemVer 0.x bump because Wave C changed the on-disk format of `MemoryStore` and `ActionAuditLog` to AES-GCM-sealed envelopes — backwards-readable (lazy migration on first read) but forwards-incompatible if a user downgrades.
+
+See entries below for the full per-wave rundown.
+
 ### Added — Trust roadmap + CI documentation (Wave H of trust polish)
 - **`docs/trust-roadmap.md`** — single source of truth for the trust-polish effort. Catalogues completed waves A–G with one-sentence rationales, plus the deliberately-deferred items (prompt-injection eval suite, evidence field on soul proposals, 195+ remaining op schema migration, lower-leverage test coverage, macOS 26 CI matrix) with explicit *trigger* clauses for when each should be pulled back to the top. The doc is index + tracker; new design rationale lives in CHANGELOG, new tasks live in issues.
 - **`docs/runtime-patch-tracking.md`** — quarterly re-evaluation procedure for the macOS 26.x runtime patch, the eight-site repro list, and a per-release log table that gets a row each time the procedure runs. Linked from every `REMOVE_WHEN:` block (Wave F's markers in `Interpose.c` + `Package.swift`).
