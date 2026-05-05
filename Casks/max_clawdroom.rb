@@ -11,8 +11,8 @@
 # release. `shasum -a 256 dist/max_clawdroom-<version>.dmg` produces
 # the hash. See RELEASE.md for the full release checklist.
 cask "max_clawdroom" do
-  version "0.4.0"
-  sha256 "0312a10f6f9547f6fae8eb03525e4d9d04dc350d69ed7972d1ea50a88e8c8943"
+  version "0.4.1"
+  sha256 "41bfeb04dacc68ad0725bce60c44504587b97a8cc87ddeac95cfb08c3827363d"
 
   url "https://github.com/peterhanily/max_clawdroom/releases/download/v#{version}/max_clawdroom-#{version}.dmg"
   name "max_clawdroom"
