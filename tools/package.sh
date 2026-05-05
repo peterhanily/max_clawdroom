@@ -90,8 +90,8 @@ BUILD_DIR="${RELEASE_BUILD_PATH}/arm64-apple-macosx/${BUILD_CONFIG}"
 # version-drift class of bugs that produced the v0.3.0 signing miss.
 # SKIP_RELEASE_CHECK=1 skips for ad-hoc local builds.
 if [ -z "${SKIP_RELEASE_CHECK:-}" ]; then
-  echo "==> validating release manifest"
-  if ! "${ROOT}/tools/check-release.sh"; then
+  echo "==> validating release manifest (pre-build mode)"
+  if ! "${ROOT}/tools/check-release.sh" --pre-build; then
     echo "release manifest check failed; aborting before build" >&2
     echo "(SKIP_RELEASE_CHECK=1 to override for local-only builds)" >&2
     exit 1

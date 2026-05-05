@@ -1,38 +1,47 @@
 #!/usr/bin/env bash
 #
-# Pre-release manifest consistency check for max_clawdroom.
+# Release manifest consistency check for max_clawdroom.
 #
-# Run with no args to validate the *current* state — every place that
-# carries a version string must agree on one number, and the appcast
-# entry for that version must verify against the Sparkle keychain
-# account whose pubkey the app embeds.
+# Two modes:
 #
-#   ./tools/check-release.sh
+#   ./tools/check-release.sh --pre-build
+#       Validates only the things that MUST match in the repo at the
+#       moment we're about to build (Info.plist ↔ CHANGELOG most-
+#       recent dated heading). Skips downstream gates that get updated
+#       *after* the build by design (cask sha256, GitHub release tag,
+#       site copy, Sparkle sig). Wired into tools/package.sh.
+#
+#   ./tools/check-release.sh           (full mode, default)
+#       Validates the entire chain — everything in pre-build mode plus
+#       cask version, latest GitHub release tag, site JSON-LD + hero
+#       pill, appcast head item, and Sparkle sig verify. Run this AFTER
+#       the release is fully published as a smoke gate before
+#       announcing.
 #
 # Exit codes:
 #   0  — all checks passed
 #   1  — at least one mismatch / missing artefact / bad signature
 #   2  — invocation error (missing tool, wrong cwd, etc.)
 #
-# Designed to be cheap to run and safe to call repeatedly. The package
-# build invokes this before staging artefacts so a misaligned ship
-# never reaches notary.
-#
-# What it checks (one version string everywhere):
-#   1. Packaging/Info.plist CFBundleShortVersionString
-#   2. CHANGELOG.md most recent dated heading
-#   3. Casks/max_clawdroom.rb `version`
-#   4. Latest GitHub release tag (gh CLI, network)
-#   5. Site `softwareVersion` JSON-LD + hero pill in index.html
-#   6. Site appcast.xml head <item> sparkle:shortVersionString
-#   7. Sparkle signature on dist/max_clawdroom-<v>.dmg verifies under
-#      the `max_clawdroom` keychain account (the keychain default
-#      `ed25519` account uses the wrong key — see RELEASE.md)
-#
 # Site repo path can be overridden via SITE_REPO=...; defaults to a
-# sibling checkout next to this repo.
+# sibling checkout next to this repo. Full mode warns (not errors) on
+# missing site repo; pre-build mode never reads it.
 
 set -uo pipefail
+
+MODE=full
+case "${1:-}" in
+  --pre-build) MODE=pre-build ;;
+  "") MODE=full ;;
+  -h|--help)
+    sed -n '/^#/p' "$0" | head -30
+    exit 0
+    ;;
+  *)
+    echo "usage: $0 [--pre-build]" >&2
+    exit 2
+    ;;
+esac
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
@@ -51,7 +60,7 @@ ok()   { printf "  ${GREEN}✓${NC} %s\n" "$1"; }
 err()  { printf "  ${RED}✗${NC} %s\n" "$1"; FAIL=1; }
 warn() { printf "  ${YELLOW}!${NC} %s\n" "$1"; }
 
-echo "${BOLD}max_clawdroom release manifest check${NC}"
+echo "${BOLD}max_clawdroom release manifest check (mode: ${MODE})${NC}"
 echo
 
 # ── 1. Info.plist ─────────────────────────────────────────────────────
@@ -74,29 +83,40 @@ else
 fi
 
 # ── 3. Cask ───────────────────────────────────────────────────────────
-CASK_VERSION=$(grep -m1 -E '^[[:space:]]*version "' Casks/max_clawdroom.rb 2>/dev/null | sed -E 's/.*"([^"]+)".*/\1/' || true)
-if [ "$CASK_VERSION" = "$EXPECTED" ]; then
-  ok "Casks/max_clawdroom.rb: ${CASK_VERSION}"
-else
-  err "Casks/max_clawdroom.rb: ${CASK_VERSION:-<none>} (expected ${EXPECTED})"
+# Cask version is bumped AFTER the DMG exists (so the sha256 is real),
+# so it lags Info.plist during a release-in-progress. Skip in pre-build
+# mode; full mode runs it as part of the post-publish smoke check.
+if [ "$MODE" = full ]; then
+  CASK_VERSION=$(grep -m1 -E '^[[:space:]]*version "' Casks/max_clawdroom.rb 2>/dev/null | sed -E 's/.*"([^"]+)".*/\1/' || true)
+  if [ "$CASK_VERSION" = "$EXPECTED" ]; then
+    ok "Casks/max_clawdroom.rb: ${CASK_VERSION}"
+  else
+    err "Casks/max_clawdroom.rb: ${CASK_VERSION:-<none>} (expected ${EXPECTED})"
+  fi
 fi
 
 # ── 4. GitHub release (network) ──────────────────────────────────────
-if command -v gh >/dev/null 2>&1; then
-  GH_TAG=$(gh release list --repo peterhanily/max_clawdroom --limit 1 --json tagName --jq '.[0].tagName' 2>/dev/null || true)
-  if [ "$GH_TAG" = "v$EXPECTED" ]; then
-    ok "GitHub latest release: ${GH_TAG}"
-  elif [ -z "$GH_TAG" ]; then
-    warn "GitHub release lookup failed (offline? unauthenticated gh?)"
+# GitHub release tag is created AFTER the DMG is built and uploaded,
+# so it also lags during release-in-progress. Full mode only.
+if [ "$MODE" = full ]; then
+  if command -v gh >/dev/null 2>&1; then
+    GH_TAG=$(gh release list --repo peterhanily/max_clawdroom --limit 1 --json tagName --jq '.[0].tagName' 2>/dev/null || true)
+    if [ "$GH_TAG" = "v$EXPECTED" ]; then
+      ok "GitHub latest release: ${GH_TAG}"
+    elif [ -z "$GH_TAG" ]; then
+      warn "GitHub release lookup failed (offline? unauthenticated gh?)"
+    else
+      err "GitHub latest release: ${GH_TAG} (expected v${EXPECTED})"
+    fi
   else
-    err "GitHub latest release: ${GH_TAG} (expected v${EXPECTED})"
+    warn "gh CLI not found; skipping GitHub release tag check"
   fi
-else
-  warn "gh CLI not found; skipping GitHub release tag check"
 fi
 
 # ── 5/6. Site repo ────────────────────────────────────────────────────
-if [ -n "$SITE_REPO" ] && [ -d "$SITE_REPO" ]; then
+# Site appcast + hero pill + JSON-LD all updated after the DMG is
+# Sparkle-signed. Full mode only.
+if [ "$MODE" = full ] && [ -n "$SITE_REPO" ] && [ -d "$SITE_REPO" ]; then
   SITE_JSONLD=$(grep -E '"softwareVersion"' "$SITE_REPO/index.html" 2>/dev/null | sed -E 's/.*"softwareVersion": "([^"]+)".*/\1/' || true)
   if [ "$SITE_JSONLD" = "$EXPECTED" ]; then
     ok "site index.html JSON-LD softwareVersion: ${SITE_JSONLD}"
@@ -117,11 +137,13 @@ if [ -n "$SITE_REPO" ] && [ -d "$SITE_REPO" ]; then
   else
     err "site appcast.xml head item: ${APPCAST_VERSION:-<none>} (expected ${EXPECTED})"
   fi
-else
+elif [ "$MODE" = full ]; then
   warn "site repo not found (set SITE_REPO=path or check out next to this repo)"
 fi
 
 # ── 7. Sparkle signature ──────────────────────────────────────────────
+# DMG + Sparkle sig don't exist until after the build. Full mode only.
+if [ "$MODE" = full ]; then
 DMG="dist/max_clawdroom-${EXPECTED}.dmg"
 SIGNER=".build/artifacts/sparkle/Sparkle/bin/sign_update"
 if [ -f "$DMG" ] && [ -x "$SIGNER" ]; then
@@ -144,6 +166,7 @@ elif [ ! -f "$DMG" ]; then
 else
   warn "sign_update not found at ${SIGNER}; run swift build first"
 fi
+fi  # end Sparkle sig block
 
 echo
 if [ $FAIL -eq 0 ]; then
