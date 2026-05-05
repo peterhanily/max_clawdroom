@@ -6,6 +6,19 @@ Versioning follows [SemVer](https://semver.org). This is an alpha — expect bre
 
 ## [Unreleased]
 
+## [0.4.1] — 2026-05-05
+
+### Fixed
+- **`set_chat_color` action falsely rejected on every emission.** Wave E's `SetChatColorInput` schema declared `expectedKeys: ["target", "color"]` and a `color: String` field, but the actual dispatcher reads `target` + `hex`. The validator correctly rejected agent emissions with the structured error *"Max's `set_chat_color` action was rejected — set_chat_color: unknown field (hex)"*, but the rejection itself was the bug — the agent was emitting the right shape; my schema was wrong. Fixed to `target` + `hex`.
+- **`bind` action falsely rejected when `amplitude` or `duration` were present.** Same class of bug as `set_chat_color`. The dispatcher reads `signal`, `part`, `mode`, optional `color`, optional `amplitude`, optional `duration`. The schema only listed the first four, so any agent tuning a binding's animation parameters got rejected. Schema now matches the handler's full surface.
+- **`write_memory` schema was dispatching on a non-existent op.** No `write_memory` op exists in the codebase — the actual durable memory ops are `remember` (text only) and `set_preference` (key/value). Removed `WriteMemoryInput`; replaced with `RememberInput` and `SetPreferenceInput` so the validation gate actually fires for the real ops.
+
+### Changed
+- **`ActionInputValidatorTests` rewritten** to match the corrected schemas, with explicit regression tests for the v0.4.0 false-rejection cases (`set_chat_color` with `hex`, `bind` with `amplitude`/`duration`). Suite is 113/113 (was 109).
+
+### Process note for future schema migrations
+The deferred-items entry in `docs/trust-roadmap.md` warned about exactly this failure mode but framed it as legacy-handler sloppiness. The actual cause this time was schema-author error: I wrote the Wave E schemas without auditing the real handlers. Subsequent schema cohorts must `grep` the dispatcher for each op and pin the field set against the real `action.args["…"]` reads before turning the schema on.
+
 ## [0.4.0] — 2026-05-05
 
 The trust-polish release. Eight waves (A–H) addressing the v0.3.1 audit's findings: docs / version sync, Settings → Privacy panel with What-Max-Sees + Action audit log, at-rest AES-GCM encryption parity for memory + audit log (joining sessions / user-model / time-capsules), pending-proposal review UI for soul patches with a 32k cumulative cap, schema-first action validation for the highest-stakes durable ops, runtime-patch tracking docs, multi-monitor AX coord refactor, and 68 new tests (41 → 109).

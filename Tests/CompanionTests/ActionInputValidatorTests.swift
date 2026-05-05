@@ -20,22 +20,40 @@ final class ActionInputValidatorTests: XCTestCase {
         XCTAssertEqual(ActionInputValidator.validate(action), .skipped)
     }
 
-    // MARK: - Happy path
+    // MARK: - Happy path — every registered op shape
 
-    func test_writeMemory_validArgs_passesValidation() {
+    func test_remember_validArgs_passesValidation() {
         let action = MaxClawdroomAction(
-            op: "write_memory",
-            args: ["kind": "preference", "text": "loves espresso"]
+            op: "remember",
+            args: ["text": "user just shipped a release"]
         )
         XCTAssertEqual(ActionInputValidator.validate(action), .ok)
     }
 
-    func test_writeMemory_optionalFieldOmitted_stillPasses() {
-        // `key` is optional on WriteMemoryInput; absent is allowed.
-        // (The schema declares it as `String?` so missing → nil.)
+    func test_setPreference_validArgs_passesValidation() {
         let action = MaxClawdroomAction(
-            op: "write_memory",
-            args: ["kind": "observation", "text": "user just shipped a release"]
+            op: "set_preference",
+            args: ["key": "theme", "value": "dark"]
+        )
+        XCTAssertEqual(ActionInputValidator.validate(action), .ok)
+    }
+
+    func test_setChatColor_validArgs_usingHex_passesValidation() {
+        // Regression: v0.4.0 shipped this schema with `color` instead
+        // of `hex`, which falsely rejected every real `set_chat_color`
+        // emission ("Max's `set_chat_color` action was rejected —
+        // unknown field (hex)"). Pin the correct field name forever.
+        let action = MaxClawdroomAction(
+            op: "set_chat_color",
+            args: ["target": "panel", "hex": "#FF5040"]
+        )
+        XCTAssertEqual(ActionInputValidator.validate(action), .ok)
+    }
+
+    func test_downloadImage_validArgs_passesValidation() {
+        let action = MaxClawdroomAction(
+            op: "download_image",
+            args: ["url": "https://example.com/img.png", "name": "vibe"]
         )
         XCTAssertEqual(ActionInputValidator.validate(action), .ok)
     }
@@ -51,28 +69,56 @@ final class ActionInputValidatorTests: XCTestCase {
         XCTAssertEqual(ActionInputValidator.validate(action), .ok)
     }
 
+    // MARK: - Bind: optional fields including amplitude/duration
+
+    func test_bind_validWithOnlyRequired() {
+        let action = MaxClawdroomAction(
+            op: "bind",
+            args: ["signal": "tool.bash", "part": "tie", "mode": "flash"]
+        )
+        XCTAssertEqual(ActionInputValidator.validate(action), .ok)
+    }
+
+    func test_bind_validWithColor() {
+        let action = MaxClawdroomAction(
+            op: "bind",
+            args: ["signal": "tool.bash", "part": "tie", "mode": "flash", "color": "#FF5040"]
+        )
+        XCTAssertEqual(ActionInputValidator.validate(action), .ok)
+    }
+
+    func test_bind_validWithAmplitudeAndDuration() {
+        // Regression: v0.4.0 shipped without amplitude/duration in
+        // expectedKeys, which falsely rejected any agent emission
+        // tuning these. Pin the correct full surface.
+        let action = MaxClawdroomAction(
+            op: "bind",
+            args: ["signal": "logprob.entropy", "part": "head", "mode": "shake",
+                   "amplitude": 0.4, "duration": 0.8]
+        )
+        XCTAssertEqual(ActionInputValidator.validate(action), .ok)
+    }
+
     // MARK: - Unknown-key (typo) rejection
 
-    func test_writeMemory_typoFieldName_rejected() {
-        // Typo `type` instead of `kind` — the dispatcher's `as? String`
-        // cast would silently no-op today. With schema validation, the
-        // user sees why the action didn't take.
+    func test_remember_typoFieldName_rejected() {
+        // Typo `txt` instead of `text` — would silently no-op today.
         let action = MaxClawdroomAction(
-            op: "write_memory",
-            args: ["type": "preference", "text": "loves espresso"]
+            op: "remember",
+            args: ["txt": "loves espresso"]
         )
         guard case .failure(let reason) = ActionInputValidator.validate(action) else {
             XCTFail("expected failure for typo'd field")
             return
         }
-        XCTAssertTrue(reason.contains("type"),
+        XCTAssertTrue(reason.contains("txt"),
                       "rejection reason should name the offending key, got: \(reason)")
     }
 
     func test_multipleUnknownKeys_listedInRejection() {
         let action = MaxClawdroomAction(
             op: "set_chat_color",
-            args: ["target": "panel", "color": "#FF0000",
+            args: ["target": "panel", "hex": "#FF0000",
                    "alpha": "0.5", "border": "#000000"]
         )
         guard case .failure(let reason) = ActionInputValidator.validate(action) else {
@@ -85,11 +131,11 @@ final class ActionInputValidatorTests: XCTestCase {
 
     // MARK: - Missing required field
 
-    func test_writeMemory_missingRequiredField_rejected() {
+    func test_remember_missingRequiredField_rejected() {
         // Missing `text` — required on the schema.
         let action = MaxClawdroomAction(
-            op: "write_memory",
-            args: ["kind": "preference"]
+            op: "remember",
+            args: [:]
         )
         guard case .failure(let reason) = ActionInputValidator.validate(action) else {
             XCTFail("expected failure for missing field")
@@ -99,37 +145,31 @@ final class ActionInputValidatorTests: XCTestCase {
                       "rejection reason should name the missing field, got: \(reason)")
     }
 
+    func test_setPreference_missingValue_rejected() {
+        let action = MaxClawdroomAction(
+            op: "set_preference",
+            args: ["key": "theme"]
+        )
+        guard case .failure(let reason) = ActionInputValidator.validate(action) else {
+            XCTFail("expected failure for missing value")
+            return
+        }
+        XCTAssertTrue(reason.contains("value"))
+    }
+
     // MARK: - Wrong type
 
-    func test_writeMemory_wrongFieldType_rejected() {
-        // `kind` declared String; pass a number.
+    func test_remember_wrongFieldType_rejected() {
+        // `text` declared String; pass a number.
         let action = MaxClawdroomAction(
-            op: "write_memory",
-            args: ["kind": 42, "text": "x"]
+            op: "remember",
+            args: ["text": 42]
         )
         guard case .failure(let reason) = ActionInputValidator.validate(action) else {
             XCTFail("expected failure for wrong type")
             return
         }
-        XCTAssertTrue(reason.lowercased().contains("type") || reason.contains("kind"),
+        XCTAssertTrue(reason.lowercased().contains("type") || reason.contains("text"),
                       "rejection reason should mention the type problem or field, got: \(reason)")
-    }
-
-    // MARK: - Bind has an optional `color`
-
-    func test_bind_validWithOptionalColorOmitted() {
-        let action = MaxClawdroomAction(
-            op: "bind",
-            args: ["signal": "tool.bash", "part": "tie", "mode": "flash"]
-        )
-        XCTAssertEqual(ActionInputValidator.validate(action), .ok)
-    }
-
-    func test_bind_validWithOptionalColorPresent() {
-        let action = MaxClawdroomAction(
-            op: "bind",
-            args: ["signal": "tool.bash", "part": "tie", "mode": "flash", "color": "#FF5040"]
-        )
-        XCTAssertEqual(ActionInputValidator.validate(action), .ok)
     }
 }

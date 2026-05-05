@@ -36,15 +36,26 @@ nonisolated protocol TypedActionInput: Decodable {
 
 // MARK: - Per-op schemas
 
-/// `write_memory` — agent records a memory entry. High-stakes because
-/// memory contents land in future system-prompt blocks.
-struct WriteMemoryInput: TypedActionInput {
-    static let op = "write_memory"
-    static let expectedKeys: Set<String> = ["kind", "text", "key"]
+/// `remember` — agent records an observation about the user. Single
+/// `text` field; the dispatcher stores it as a `MemoryEntry.observation`
+/// and counts against the per-turn memory-op budget. High-stakes
+/// because the text lands in future `[memory]` system-prompt blocks.
+struct RememberInput: TypedActionInput {
+    static let op = "remember"
+    static let expectedKeys: Set<String> = ["text"]
 
-    let kind: String
     let text: String
-    let key: String?
+}
+
+/// `set_preference` — agent records a typed user preference (latest-
+/// write-wins by `key`). Same blast radius as `remember` — preference
+/// values render verbatim in the `[memory]` block.
+struct SetPreferenceInput: TypedActionInput {
+    static let op = "set_preference"
+    static let expectedKeys: Set<String> = ["key", "value"]
+
+    let key: String
+    let value: String
 }
 
 /// `propose_soul_patch` / `update_soul` — agent proposes a personality
@@ -58,15 +69,17 @@ struct ProposeSoulPatchInput: TypedActionInput {
     let patch: String
 }
 
-/// `set_chat_color` — persisted chat-theme channel mutation. Unknown
-/// `target` values silently no-op today; the schema rejects garbage
-/// before the dispatcher's switch.
+/// `set_chat_color` — persisted chat-theme channel mutation. The
+/// dispatcher's handler reads `target` (which `ChatTheme.Target` enum
+/// case) and `hex` (the `#rrggbb` colour). Unknown `target` values
+/// silently no-op today; the schema rejects garbage before the
+/// dispatcher's switch.
 struct SetChatColorInput: TypedActionInput {
     static let op = "set_chat_color"
-    static let expectedKeys: Set<String> = ["target", "color"]
+    static let expectedKeys: Set<String> = ["target", "hex"]
 
     let target: String
-    let color: String
+    let hex: String
 }
 
 /// `download_image` — fetches an arbitrary URL into the image library
@@ -83,15 +96,18 @@ struct DownloadImageInput: TypedActionInput {
 
 /// `bind` — wires an agent telemetry signal to a body part. Persisted
 /// across sessions; mistyped signal names today surface only by Max
-/// not visibly reacting.
+/// not visibly reacting. Optional `amplitude` and `duration` tune the
+/// resulting animation (per `BindingParams`).
 struct BindInput: TypedActionInput {
     static let op = "bind"
-    static let expectedKeys: Set<String> = ["signal", "part", "mode", "color"]
+    static let expectedKeys: Set<String> = ["signal", "part", "mode", "color", "amplitude", "duration"]
 
     let signal: String
     let part: String
     let mode: String
     let color: String?
+    let amplitude: Double?
+    let duration: Double?
 }
 
 // MARK: - Validator
@@ -115,7 +131,8 @@ enum ActionInputValidator {
     /// handler tolerated a sloppy arg shape would surface false
     /// rejections.
     private static let schemas: [String: any TypedActionInput.Type] = [
-        WriteMemoryInput.op:        WriteMemoryInput.self,
+        RememberInput.op:           RememberInput.self,
+        SetPreferenceInput.op:      SetPreferenceInput.self,
         ProposeSoulPatchInput.op:   ProposeSoulPatchInput.self,
         // `update_soul` is the legacy alias for propose_soul_patch
         // (handled by the same dispatcher arm) — both share the schema.
