@@ -6,6 +6,11 @@ Versioning follows [SemVer](https://semver.org). This is an alpha — expect bre
 
 ## [Unreleased]
 
+### Added — Trust roadmap + CI documentation (Wave H of trust polish)
+- **`docs/trust-roadmap.md`** — single source of truth for the trust-polish effort. Catalogues completed waves A–G with one-sentence rationales, plus the deliberately-deferred items (prompt-injection eval suite, evidence field on soul proposals, 195+ remaining op schema migration, lower-leverage test coverage, macOS 26 CI matrix) with explicit *trigger* clauses for when each should be pulled back to the top. The doc is index + tracker; new design rationale lives in CHANGELOG, new tasks live in issues.
+- **`docs/runtime-patch-tracking.md`** — quarterly re-evaluation procedure for the macOS 26.x runtime patch, the eight-site repro list, and a per-release log table that gets a row each time the procedure runs. Linked from every `REMOVE_WHEN:` block (Wave F's markers in `Interpose.c` + `Package.swift`).
+- **CI workflow comment** updated to flag the macOS 26 runner gap as an explicit known coverage gap with a clear pull-trigger ("the day GitHub Actions adds the image"). Was previously framed as incidental — now framed as tracked.
+
 ### Added — Highest-leverage test coverage gaps (Wave G of trust polish)
 The trust audit listed thin coverage as a real risk, naming the streaming-parser boundary, AX denylist, and memory sanitisation as the surfaces that mattered most. Wave G closes those three:
 - **AX denylist tests (`AccessibilityBridgeDenylistTests`).** Pure-helper `isSensitiveBundle(_:)` extracted from `frontmostIsSensitive` so the bundle-ID matching logic can be exercised without `NSWorkspace`. 14 cases across exact-match (Mail, Keychain, Signal, iTerm2, Warp), prefix-match (1Password / Keychain / Bitwarden variants), explicit non-sensitive bundles (Xcode, Safari, VSCode, Finder so an overzealous future entry can't blanket `com.apple.`), and edge cases (nil, empty, case sensitivity, substring-not-prefix).

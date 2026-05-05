@@ -10,10 +10,16 @@ on:
 jobs:
   test:
     name: swift test
-    # macOS 26 isn't a GitHub-hosted runner image yet; we run on the
-    # latest available (currently macOS 14 / Sonoma) which has the
-    # working Swift runtime. CompanionRuntimePatch's hooks no-op
-    # cleanly on this OS via the version check in install_runtime_hooks.
+    # KNOWN COVERAGE GAP: macOS 26 isn't a GitHub-hosted runner image
+    # yet, so the CompanionRuntimePatch interposer (Sources/Companion-
+    # RuntimePatch/Interpose.c) is NOT exercised in CI — its hooks
+    # no-op cleanly on this Sonoma runner via the version check in
+    # install_runtime_hooks. The workaround stays load-bearing on
+    # 26.x dev machines until Apple fixes the runtime; tracked
+    # alongside the C target's REMOVE_WHEN block. Add a `macos-26`
+    # matrix entry the day GitHub Actions adds the image — at that
+    # point CI catches any future regression in the interpose path
+    # before a release.
     runs-on: macos-latest
 
     steps:
