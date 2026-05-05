@@ -1,6 +1,33 @@
 // macOS 26.x runtime workaround — dyld INTERPOSE for Swift's
 // dynamic actor-isolation check.
 //
+// REMOVE_WHEN: Apple ships the libswift_Concurrency fix for
+//   swift_task_isCurrentExecutorWithFlagsImpl on macOS 26.x.
+//   Re-evaluate quarterly when each macOS 26 point release lands
+//   (26.1, 26.2, …) — drop a fresh-VM dev build under Instruments,
+//   exercise the eight-call-site repro list below, and if no probe
+//   crash reproduces over a full session, delete:
+//     • this file
+//     • Sources/CompanionRuntimePatch/include/CompanionRuntimePatch.h
+//     • the CompanionRuntimePatch target in Package.swift
+//     • the .unsafeFlags(["-Xfrontend", "-disable-dynamic-actor-isolation"])
+//       entry in the Companion target's swiftSettings
+//   Each change carries a CHANGELOG entry citing the macOS version
+//   where the underlying bug was confirmed fixed. See also
+//   docs/runtime-patch-tracking.md for the per-release log.
+//
+// Repro call-site list (any one re-crashing means the fix isn't
+// complete and the patch stays):
+//   1. NSEvent.addGlobalMonitorForEvents
+//   2. NSTimer scheduledTimer + Combine .publish().autoconnect()
+//   3. MouseTracker mouseMoved poll
+//   4. NSWindow @objc property getters
+//   5. SwiftUI body closures touching @ObservedObject
+//   6. _ButtonGesture.internalBody (clicks)
+//   7. NSGestureRecognizer @objc handlers
+//   8. AVAudioEngine completion callbacks
+
+//
 // THE PROBLEM
 // ───────────
 // Swift 6 emits `swift_task_isCurrentExecutorWithFlagsImpl` calls at

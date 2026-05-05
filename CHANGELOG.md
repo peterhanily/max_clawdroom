@@ -6,6 +6,11 @@ Versioning follows [SemVer](https://semver.org). This is an alpha — expect bre
 
 ## [Unreleased]
 
+### Added — Runtime-patch tracking + multi-monitor coord refactor (Wave F of trust polish)
+- **`REMOVE_WHEN:` markers on the macOS 26.x runtime patch.** `Sources/CompanionRuntimePatch/Interpose.c` now carries a quarterly-re-evaluation procedure block at the top — fresh-VM dev build under Instruments, exercise the eight-call-site repro list, drop the entire patch (this file + header + Package.swift target + `-disable-dynamic-actor-isolation` flag) when no probe crash reproduces over a full session. Same marker on the `swiftSettings` flag in `Package.swift` so both removals are linked. Eliminates the "what is this and why" mystery the security review flagged as a maintenance burden.
+- **`AccessibilityBridge.cocoaRect(fromAXRect:)` refactored** — pure math extracted into `cocoaRect(fromAXRect:primaryScreenHeight:)`. The math was always correct (AX→Cocoa vertical flip is a single-screen transform regardless of how many displays you have, because both spaces share the primary as their reference); the comment claimed otherwise. Comment now accurately documents *why* only primary height matters and how negative / above-primary y values fall out for free.
+- **Tests** — 7 cases in `AccessibilityBridgeCoordTests` pinning the transform across single-display, secondary-above-primary (negative AX y), secondary-below-primary, zero-size, full-screen, and x-axis pass-through scenarios — all driven through the parameterised overload so tests don't have to mock `NSScreen.screens`.
+
 ### Added — Schema-first action validation (Wave E of trust polish)
 - **`TypedActionInput` protocol + per-op schemas** — first cohort: `WriteMemoryInput`, `ProposeSoulPatchInput` (also wired as `update_soul` legacy alias), `SetChatColorInput`, `DownloadImageInput`, `BindInput`. Each declares its `op` name and a strict `expectedKeys` whitelist. `ActionInputValidator.validate(_:)` runs as the first step of `MaxClawdroomAction.dispatch` — three failure modes surface as structured `ChatSession.errorMessage` strings the model sees on its next turn:
   - Unknown key (typo `type` for `kind`, hallucinated args) — listed by name

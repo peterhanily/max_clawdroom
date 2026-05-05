@@ -90,7 +90,12 @@ let package = Package(
                 // invocation for the @objc bridge sites where the bug
                 // surfaces.
                 //
-                // Revert this flag once Apple ships the runtime fix.
+                // REMOVE_WHEN: Apple ships the macOS 26.x libswift_Concurrency
+                // fix. Tracked alongside Sources/CompanionRuntimePatch/Interpose.c
+                // — see the REMOVE_WHEN block at the top of that file for the
+                // quarterly re-evaluation procedure and the eight repro sites.
+                // Both removals must land in one PR with a CHANGELOG entry
+                // citing the confirmed-fixed macOS version.
                 .unsafeFlags(["-Xfrontend", "-disable-dynamic-actor-isolation"])
             ]
         ),

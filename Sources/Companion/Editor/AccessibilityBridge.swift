@@ -67,9 +67,17 @@ enum AccessibilityBridge {
     /// FileVault unlock, etc).
     static func frontmostIsSensitive() -> Bool {
         if IsSecureEventInputEnabled() { return true }
-        guard let app = NSWorkspace.shared.frontmostApplication,
-              let bundle = app.bundleIdentifier
-        else { return false }
+        return isSensitiveBundle(NSWorkspace.shared.frontmostApplication?.bundleIdentifier)
+    }
+
+    /// Pure denylist verdict for a given bundle ID. Extracted from
+    /// `frontmostIsSensitive` so tests can exercise the matching logic
+    /// against synthetic bundle IDs without touching `NSWorkspace`
+    /// (which is global, async-mutable, and effectively un-mockable
+    /// in unit tests). nil / empty bundle returns false — neither is a
+    /// real app and we'd rather leak nothing than mis-classify.
+    static func isSensitiveBundle(_ bundle: String?) -> Bool {
+        guard let bundle, !bundle.isEmpty else { return false }
         if sensitiveBundleIDs.contains(bundle) { return true }
         for prefix in sensitiveBundlePrefixes where bundle.hasPrefix(prefix) {
             return true
@@ -159,18 +167,40 @@ enum AccessibilityBridge {
         )
     }
 
-    /// Convert an AX rectangle (top-left origin of the primary display) to
-    /// Cocoa global coordinates (bottom-left origin). Handles multi-monitor
-    /// by using the total virtual desktop height from the primary screen.
+    /// Convert an AX rectangle (top-left origin of the primary display)
+    /// to Cocoa global coordinates (bottom-left origin of the primary
+    /// display).
     ///
-    /// AX coordinate system: y grows downward from the TOP of the primary
-    /// display. Cocoa global: y grows upward from the BOTTOM of the primary
-    /// display. So `cocoa_y = primary_height - ax_y - rect_height`.
+    /// **Why only the primary screen height is needed.** Both coord
+    /// systems are anchored to the primary display: AX y=0 is the top
+    /// of primary, Cocoa y=0 is the bottom of primary. The transform is
+    /// purely vertical and only depends on `primaryHeight`. Rectangles
+    /// on secondary displays (negative y for displays above primary,
+    /// y > primaryHeight for displays below) Just Work — `axY < 0`
+    /// produces `cocoaY > primaryHeight` (above primary in Cocoa) and
+    /// `axY > primaryHeight` produces `cocoaY < 0` (below primary in
+    /// Cocoa), which is exactly right since both spaces share the same
+    /// reference frame.
+    ///
+    /// `cocoa_y = primary_height - ax_y - rect_height`
+    ///
+    /// The pure math is in `cocoaRect(fromAXRect:primaryScreenHeight:)`
+    /// so tests can exercise multi-display geometries without touching
+    /// the real `NSScreen.screens` array (which is global, headless-
+    /// hostile, and effectively un-mockable in unit tests).
     static func cocoaRect(fromAXRect axRect: CGRect) -> CGRect? {
-        // Primary screen (the one with the menu bar) — NSScreen.screens[0]
         guard let primary = NSScreen.screens.first else { return nil }
-        let primaryHeight = primary.frame.height
-        let cocoaY = primaryHeight - axRect.origin.y - axRect.size.height
+        return cocoaRect(fromAXRect: axRect, primaryScreenHeight: primary.frame.height)
+    }
+
+    /// Pure-math AX→Cocoa transform. Same formula as the live entry
+    /// point, parameterised on `primaryScreenHeight` so tests can pin
+    /// the contract under synthetic display geometries.
+    static func cocoaRect(
+        fromAXRect axRect: CGRect,
+        primaryScreenHeight: CGFloat
+    ) -> CGRect {
+        let cocoaY = primaryScreenHeight - axRect.origin.y - axRect.size.height
         return CGRect(
             x: axRect.origin.x,
             y: cocoaY,
