@@ -32,20 +32,27 @@ jobs:
         # 'refs/tags/vX.Y.Z^{}'`), paste here.
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
 
-      - name: Install Swift 6.3.1 toolchain
+      - name: Install Swift 6.3.1 via swiftly
         # The hosted macos-latest image ships only Xcode 16.x (Swift 6.1),
         # so every prior CI run died at manifest parse (Package.swift needs
-        # swift-tools 6.2). swiftly installs a swift.org toolchain and
-        # points `swift` at it; it builds against the active Xcode's macOS
-        # SDK. We pin 6.3.1 — NOT just 6.2 — because the source's
-        # main-actor isolation annotations only type-check under the 6.3
-        # concurrency checker (the dev/ship toolchain); 6.2.1 rejects
-        # several @MainActor closure captures the codebase relies on.
-        # Bump this to match the dev Xcode's Swift when it moves.
-        # Pinned to swift-actions/setup-swift v2.4.0.
-        uses: swift-actions/setup-swift@7ca6abe6b3b0e8b5421b88be48feee39cbf52c6a
-        with:
-          swift-version: "6.3.1"
+        # swift-tools 6.2). We need Swift 6.3 specifically: the source's
+        # @MainActor annotations only type-check under the 6.3 concurrency
+        # checker (the dev/ship toolchain); 6.2.1 rejects several main-actor
+        # closure captures the codebase relies on. The setup-swift action
+        # only knows versions up to 6.2.x, so install swift.org's 6.3.1
+        # toolchain directly with swiftly and put its shim on PATH for the
+        # later build/test steps. Builds against the active Xcode's macOS
+        # SDK. Bump the version when the dev Xcode's Swift moves.
+        run: |
+          set -euxo pipefail
+          curl -fsSL -O https://download.swift.org/swiftly/darwin/swiftly.pkg
+          installer -pkg swiftly.pkg -target CurrentUserHomeDirectory
+          "$HOME/.swiftly/bin/swiftly" init --assume-yes --skip-install --quiet-shell-followup
+          . "$HOME/.swiftly/env.sh"
+          swiftly install 6.3.1
+          swiftly use 6.3.1
+          echo "$HOME/.swiftly/bin" >> "$GITHUB_PATH"
+          swift --version
 
       - name: Show toolchain
         run: swift --version
