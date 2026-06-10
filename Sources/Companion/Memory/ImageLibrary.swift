@@ -151,7 +151,7 @@ final class ImageLibrary {
 
     /// Download an image from a URL and add it to the library. Hardened:
     ///   - Pref gate (opt-in)
-    ///   - Only http / https
+    ///   - HTTPS only (matches the Settings copy's promise)
     ///   - Blocks private/loopback/link-local hosts (SSRF defense)
     ///   - Size cap + timeout
     ///   - Content-Type must be image/*
@@ -161,8 +161,10 @@ final class ImageLibrary {
     func downloadImage(from urlString: String, name: String) async throws -> LibraryImage {
         guard Prefs.allowAgentImageOps else { throw ImportError.disabledByUser }
         guard let url = URL(string: urlString) else { throw ImportError.invalidURL }
-        guard let scheme = url.scheme?.lowercased(),
-              scheme == "http" || scheme == "https"
+        // HTTPS only. Plain http was previously accepted despite the UI
+        // promising "HTTPS only"; cleartext also makes the SSRF host check
+        // trivially MITM-able. Enforce the contract the UI states.
+        guard url.scheme?.lowercased() == "https"
         else { throw ImportError.schemeNotAllowed }
         guard let host = url.host, !Self.isPrivateOrLoopbackHost(host)
         else { throw ImportError.privateAddressBlocked }

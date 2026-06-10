@@ -24,7 +24,8 @@ We do not currently run a paid bounty programme. We will credit reporters public
 
 | Version | Supported          |
 |---------|--------------------|
-| 0.3.x   | ✅ current         |
+| 0.4.x   | ✅ current         |
+| 0.3.x   | ❌ end-of-life     |
 | 0.2.x   | ❌ end-of-life     |
 | 0.1.x   | ❌ end-of-life     |
 

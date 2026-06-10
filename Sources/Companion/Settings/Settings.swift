@@ -109,6 +109,15 @@ struct BackendSettings: Codable, Equatable {
     static let defaultAllowedTools =
         "Read,Edit,Write,Glob,Grep,Bash(*),WebFetch(*),WebSearch(*)"
 
+    /// Tool posture for the loopback OpenAI HTTP server (`LocalOpenAIServer`).
+    /// Deliberately read-only — the server answers chat-completion requests
+    /// for external tools (Cursor, scripts) that expect text generation, not
+    /// autonomous shell/file mutation in the user's working directory.
+    /// Pre-approving `Bash(*)`/`Write` here turned any caller holding the
+    /// bearer token into a command-execution channel; the chat UI keeps the
+    /// fuller `defaultAllowedTools` because the user is present to see it.
+    static let defaultServerAllowedTools = "Read,Glob,Grep"
+
     static let `default` = BackendSettings(
         schemaVersion: BackendSettings.currentSchemaVersion,
         claudeBinaryPath: Self.autoDetectedClaudePath(),

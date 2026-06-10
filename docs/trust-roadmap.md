@@ -78,7 +78,7 @@ Each entry names: what it is, why it isn't shipped, and the trigger that should 
 
 **What.** A `macos-26` runner entry in `.github/workflows/test.yml` so the CompanionRuntimePatch interposer is exercised on every PR.
 
-**Why deferred.** GitHub-hosted images for macOS 26 aren't available yet. Until they are, the CI runs on Sonoma where the runtime patch's hooks correctly no-op (it's gated on `pthread_main_np()` semantics that match upstream Swift on the older OS).
+**Why deferred.** GitHub-hosted images for macOS 26 aren't available yet. Until they are, CI runs on the `macos-latest` image with a Swift 6.2+ toolchain selected explicitly (`Package.swift` needs swift-tools 6.2; the default-selected Xcode on the runner was Swift 6.1, which silently failed every run at manifest parse until that step was added — see `.github/workflows/test.yml`). On that image the runtime patch's hooks correctly no-op, so the interposer path itself is still not exercised in CI; the `macos-26` entry is what closes that gap.
 
 **Trigger.** Pull back the day [`actions/runner-images`](https://github.com/actions/runner-images) lists `macos-26` as a supported label.
 

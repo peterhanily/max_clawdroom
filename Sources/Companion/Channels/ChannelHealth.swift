@@ -139,7 +139,10 @@ final class ChannelHealth {
             case 200..<300:
                 latencyEMA = (latencyEMA == 0) ? elapsed : (0.7 * latencyEMA + 0.3 * elapsed)
                 state = (latencyEMA > 1.2) ? .slow : .live
-            case 401:
+            case 401, 403:
+                // Match the stream-side classifier (OpenAIHTTPError maps
+                // both to .unauthorized) so a 403-ing channel shows
+                // "check the API key", not a misleading "unreachable".
                 state = .unauthorized
             default:
                 state = .unreachable

@@ -24,10 +24,40 @@ jobs:
 
     steps:
       - name: Checkout
-        # Pinned to commit SHA (v4.2.2). Updating: visit
+        # Pinned to commit SHA (v6.0.3, node24). The prior pin was a
+        # node20 action; GitHub defaults runners to node24 from
+        # 2026-06-16 and removes node20 later in 2026. Updating: visit
         # https://github.com/actions/checkout/releases, copy the new
-        # tag's commit SHA, paste here.
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        # tag's commit SHA (peel annotated tags: `git ls-remote ...
+        # 'refs/tags/vX.Y.Z^{}'`), paste here.
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+
+      - name: Select Swift 6.2+ toolchain
+        # Package.swift requires swift-tools 6.2 (Xcode 26+). The runner's
+        # default-selected Xcode may be older (Swift 6.1), which fails at
+        # manifest parse before any build/test runs — the bug that kept
+        # every CI run red. Pick the newest installed Xcode whose Swift is
+        # >= 6.2; fail loudly if none exists rather than emit the cryptic
+        # manifest error.
+        run: |
+          best=""
+          for xc in $(ls -d /Applications/Xcode*.app 2>/dev/null | sort -rV); do
+            sw="$xc/Contents/Developer/usr/bin/swift"
+            [ -x "$sw" ] || continue
+            ver=$("$sw" --version 2>/dev/null | sed -nE 's/.*Swift version ([0-9]+\.[0-9]+).*/\1/p' | head -1)
+            [ -n "$ver" ] || continue
+            if [ "$(printf '%s\n6.2\n' "$ver" | sort -V | head -1)" = "6.2" ]; then
+              best="$xc"; break
+            fi
+          done
+          if [ -n "$best" ]; then
+            echo "Selecting $best (Swift $("$best/Contents/Developer/usr/bin/swift" --version | sed -nE 's/.*Swift version ([0-9]+\.[0-9]+).*/\1/p' | head -1))"
+            sudo xcode-select -s "$best/Contents/Developer"
+          else
+            echo "::error::No installed Xcode provides Swift 6.2+ (Package.swift needs swift-tools 6.2)."
+            ls -d /Applications/Xcode*.app 2>/dev/null || true
+            exit 1
+          fi
 
       - name: Show toolchain
         run: swift --version

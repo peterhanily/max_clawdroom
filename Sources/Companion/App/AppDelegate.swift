@@ -680,16 +680,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func reconcileLocalServer() {
         if Prefs.localOpenAIServerEnabled {
-            if localServer == nil {
-                let handler = OpenAIChatCompletions(initial: currentServerSnapshot())
-                let server = LocalOpenAIServer(handler: handler)
-                do {
-                    try server.start()
-                    localServer = server
-                    localServerHandler = handler
-                } catch {
-                    AppLog.app.error("failed to start local OpenAI server: \(error.localizedDescription, privacy: .public)")
-                }
+            // (Re)start so a freshly-regenerated token or updated settings
+            // snapshot takes effect without an app relaunch. Cheap: this only
+            // fires at launch and on the user-initiated toggle / token-
+            // regenerate notification, so dropping any in-flight connection
+            // on restart is acceptable.
+            localServer?.stop()
+            let handler = OpenAIChatCompletions(initial: currentServerSnapshot())
+            let server = LocalOpenAIServer(token: Prefs.localOpenAIServerToken, handler: handler)
+            do {
+                try server.start()
+                localServer = server
+                localServerHandler = handler
+            } catch {
+                AppLog.app.error("failed to start local OpenAI server: \(error.localizedDescription, privacy: .public)")
+                localServer = nil
+                localServerHandler = nil
             }
         } else {
             localServer?.stop()
@@ -707,8 +713,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return LocalServerSettingsSnapshot(
             executablePath: s.claudeBinaryPath,
             cwd: s.cwd,
-            permissionMode: s.permissionMode,
-            allowedTools: s.allowedTools.isEmpty ? nil : s.allowedTools,
+            // The server runs unattended for external callers, so it does
+            // NOT inherit the chat backend's permissionMode/allowedTools
+            // (which pre-approve Bash(*) + acceptEdits for the present
+            // user). It gets a read-only posture instead.
+            permissionMode: "default",
+            allowedTools: BackendSettings.defaultServerAllowedTools,
             model: s.model.isEmpty ? nil : s.model
         )
     }

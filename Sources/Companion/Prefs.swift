@@ -34,6 +34,7 @@ enum Prefs {
     private static let lastMonthlySummaryKey = "companion.session.last_monthly_summary"
     private static let banterFrequencyKey = "companion.autonomy.banter_frequency"
     private static let localServerEnabledKey = "companion.server.openai_local_enabled"
+    private static let localServerTokenKey = "companion.server.openai_local_token"
     private static let agentLifecycleEnabledKey = "companion.autonomy.lifecycle_enabled"
     private static let allowAgentImageOpsKey = "companion.agent.allow_image_ops"
     private static let soulAutoApplyKey = "companion.soul.auto_apply"
@@ -287,6 +288,38 @@ enum Prefs {
             UserDefaults.standard.set(newValue, forKey: localServerEnabledKey)
             NotificationCenter.default.post(name: .companionLocalServerChanged, object: nil)
         }
+    }
+
+    /// Per-install bearer token guarding the loopback OpenAI server.
+    /// Loopback bind stops LAN peers, but any *local* process — including
+    /// a web page the user visits (a JS `fetch` to 127.0.0.1) — can reach
+    /// the port. The token is the gate a cross-origin browser script or
+    /// unrelated local app can't satisfy. Generated lazily on first read
+    /// (CSPRNG-backed) and persisted.
+    static var localOpenAIServerToken: String {
+        if let t = UserDefaults.standard.string(forKey: localServerTokenKey), !t.isEmpty {
+            return t
+        }
+        let t = Self.makeRandomToken()
+        UserDefaults.standard.set(t, forKey: localServerTokenKey)
+        return t
+    }
+
+    /// Mint and persist a fresh server token, returning it. Backs the
+    /// Settings "Regenerate" affordance; the server picks it up on its
+    /// next (re)start.
+    @discardableResult
+    static func regenerateLocalOpenAIServerToken() -> String {
+        let t = Self.makeRandomToken()
+        UserDefaults.standard.set(t, forKey: localServerTokenKey)
+        return t
+    }
+
+    private static func makeRandomToken() -> String {
+        // SystemRandomNumberGenerator is CSPRNG-backed on Apple platforms.
+        let alphabet = Array("ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789")
+        var rng = SystemRandomNumberGenerator()
+        return String((0..<40).map { _ in alphabet.randomElement(using: &rng)! })
     }
 
     /// When true, the pet falls back to Form.baseY after drag-release and

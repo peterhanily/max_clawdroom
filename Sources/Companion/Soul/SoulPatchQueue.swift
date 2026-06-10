@@ -193,21 +193,87 @@ final class SoulPatchQueue {
         return (.applied, true)
     }
 
-    /// Returns the matched deny-pattern phrase (lowercased) when the
-    /// combined rationale+patch text contains a known prompt-injection or
+    /// Returns the matched deny-pattern phrase when the combined
+    /// rationale+patch text contains a known prompt-injection or
     /// exfiltration shape, else nil.
     ///
-    /// Patterns are case-insensitive substrings. Conservative — they catch
-    /// obvious "you are now…" / "ignore previous instructions" jailbreaks,
-    /// soul-prompt manipulation ("system prompt", "your real instructions"),
-    /// and exfiltration verbs combined with destination words ("send to
-    /// http", "exfiltrate", "POST to", curl-like patterns).
+    /// Two passes (ported from the tvOS sibling, which had the hardened
+    /// version while the Mac shipped naive substring matching):
+    ///   1. Lowercased substring match — catches path-shaped patterns like
+    ///      ".ssh/" or "/etc/passwd" precisely, before normalization would
+    ///      collapse them to over-broad tokens.
+    ///   2. Normalized match — defangs trivial obfuscation that plain
+    ///      `contains` misses: leet ("1gnore"), punctuation/whitespace
+    ///      injection ("ignore-previous", "i.g.n.o.r.e previous", double
+    ///      spaces), and homoglyph-ish substitutions. Restricted to needles
+    ///      whose normalized form is ≥ 6 chars so collapsed short patterns
+    ///      can't match unrelated prose.
     static func denyPatternMatch(in combined: String) -> String? {
-        let haystack = combined.lowercased()
-        for needle in denyPatterns where haystack.contains(needle) {
-            return needle
+        let lowered = combined.lowercased()
+        let normalizedHaystack = normalize(combined)
+        for needle in denyPatterns {
+            if lowered.contains(needle) { return needle }
+            let n = normalize(needle)
+            if n.count >= 6, normalizedHaystack.contains(n) {
+                return needle
+            }
         }
         return nil
+    }
+
+    /// Collapse trivial obfuscation to a canonical form: leet→letters,
+    /// non-alphanumerics→spaces (then runs collapsed), and runs of
+    /// single-letter tokens glued back together so "i.g.n.o.r.e" → "ignore".
+    static func normalize(_ s: String) -> String {
+        let leetMap: [Character: Character] = [
+            "0": "o", "1": "i", "3": "e", "4": "a", "5": "s",
+            "7": "t", "$": "s", "@": "a", "!": "i"
+        ]
+        var out = ""
+        out.reserveCapacity(s.count)
+        for ch in s.lowercased() {
+            if let mapped = leetMap[ch] {
+                out.append(mapped)
+            } else if ch.isLetter || ch.isNumber {
+                out.append(ch)
+            } else {
+                out.append(" ")
+            }
+        }
+        // Collapse runs of whitespace.
+        var collapsed = ""
+        collapsed.reserveCapacity(out.count)
+        var lastWasSpace = false
+        for ch in out {
+            if ch == " " {
+                if !lastWasSpace { collapsed.append(ch) }
+                lastWasSpace = true
+            } else {
+                collapsed.append(ch)
+                lastWasSpace = false
+            }
+        }
+        // Glue runs of single-letter tokens. "i.g.n.o.r.e" passes through
+        // the punct→space step as "i g n o r e"; a search for "ignore"
+        // would miss it. Merging any sequence of length-1 alphanumerics
+        // fuses them back without affecting normal prose (standalone
+        // single-letter words are rare and safe to rejoin).
+        let tokens = collapsed.split(separator: " ", omittingEmptySubsequences: true)
+        var merged: [String] = []
+        var run: [Substring] = []
+        for tok in tokens {
+            if tok.count == 1 {
+                run.append(tok)
+            } else {
+                if !run.isEmpty {
+                    merged.append(run.joined())
+                    run.removeAll()
+                }
+                merged.append(String(tok))
+            }
+        }
+        if !run.isEmpty { merged.append(run.joined()) }
+        return merged.joined(separator: " ")
     }
 
     private static let denyPatterns: [String] = [

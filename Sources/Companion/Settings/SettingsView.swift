@@ -848,6 +848,7 @@ private final class UserModelProxy {
 /// no discovery).
 struct LocalOpenAIServerPanel: View {
     @State private var enabled: Bool = Prefs.localOpenAIServerEnabled
+    @State private var token: String = Prefs.localOpenAIServerToken
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -864,12 +865,40 @@ struct LocalOpenAIServerPanel: View {
             .toggleStyle(.switch)
 
             if enabled {
-                Text("Point any OpenAI client at `http://127.0.0.1:52429/v1`. Loopback only — not exposed to the network. Replaces the standalone clawdex proxy.")
+                Text("Point any OpenAI client at `http://127.0.0.1:52429/v1`. Loopback only, and every request must send the bearer token below — that token is what stops a web page you visit from driving the backend. Replaces the standalone clawdex proxy.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack(spacing: 6) {
+                    Text("Bearer")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                    Text(token)
+                        .font(.system(size: 10, design: .monospaced))
+                        .textSelection(.enabled)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Button {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(token, forType: .string)
+                    } label: { Image(systemName: "doc.on.doc") }
+                        .buttonStyle(.borderless)
+                        .help("Copy token")
+                    Button {
+                        token = Prefs.regenerateLocalOpenAIServerToken()
+                        NotificationCenter.default.post(name: .companionLocalServerChanged, object: nil)
+                    } label: { Image(systemName: "arrow.clockwise") }
+                        .buttonStyle(.borderless)
+                        .help("Regenerate token (restarts the server)")
+                }
+
+                Text("Read-only tools (no Bash/Write) — external callers can't run commands or edit files through this endpoint.")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             } else {
-                Text("When on, Cursor/Continue/scripts can call Claude through this app. Localhost only.")
+                Text("When on, Cursor/Continue/scripts can call Claude through this app. Localhost only, bearer-token-gated, read-only tools.")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

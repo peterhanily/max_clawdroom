@@ -100,14 +100,16 @@ See `Packaging/Info.plist` and `Packaging/max_clawdroom.entitlements`.
 
 ### Entitlements highlights
 - **No sandbox** — `max_clawdroom` reads other apps' UI via the Accessibility API (EditorAwareness reads cursor line + selection from Xcode/Nova/VSCode). Sandboxing forbids this. Developer ID distribution permits it; Mac App Store distribution would not.
-- `com.apple.security.cs.allow-jit` + `allow-unsigned-executable-memory` — MLX / Kokoro compiles Metal shaders at runtime.
-- `com.apple.security.cs.disable-library-validation` — the bundled `mlx.metallib` isn't signed by Apple; library validation would otherwise refuse to load it.
-- `com.apple.security.cs.allow-dyld-environment-variables` — the `claude` subprocess inherits our env; some users need `DYLD_*` or `PATH` overrides.
 - `com.apple.security.network.client` — future agent ops might fetch URLs.
 - `com.apple.security.device.audio-input` — wake-on-voice microphone access.
 
+That is the whole list — two entitlements beyond Hardened Runtime. The source of truth is `Packaging/max_clawdroom.entitlements`; this section must match it.
+
 ### What is NOT entitled
 - `com.apple.security.app-sandbox` — intentional, see above.
+- `com.apple.security.cs.allow-jit` + `allow-unsigned-executable-memory` — **dropped.** The JIT/unsigned-memory entitlements existed only for the MLX/Kokoro-82M voice path; MLX was removed in 0.1.1, so these came out with it. Re-add ONLY if a JIT'd shader / library-loaded backend returns, and document why.
+- `com.apple.security.cs.disable-library-validation` — **dropped** with MLX (no unsigned dylibs ship anymore).
+- `com.apple.security.cs.allow-dyld-environment-variables` — **dropped.** We strip `DYLD_*` explicitly before launching the `claude` subprocess (`ClaudeCodeProcess.start()`), so inheriting them is neither needed nor wanted.
 - `com.apple.security.automation.apple-events` — Accessibility API uses a separate TCC bucket that the user grants in System Settings. No entitlement needed.
 - `com.apple.security.files.user-selected.read-write` — not sandboxed, so filesystem access just works for `~/Library/Application Support/Companion/`.
 

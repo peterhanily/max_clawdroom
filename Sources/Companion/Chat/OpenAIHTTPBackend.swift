@@ -247,43 +247,62 @@ private final class SSEDelegate: NSObject, URLSessionDataDelegate, @unchecked Se
             }
             return
         }
-        buffer.append(data)
+        // Normalize line endings: SSE permits CRLF, and proxies/CDNs in
+        // front of OpenAI-compatible servers emit `\r\n\r\n`. Stripping raw
+        // CR bytes turns CRLF→LF (and `\r\n\r\n`→`\n\n`) so the `\n\n` frame
+        // split below works against either. Safe: JSON encodes a literal
+        // carriage return as `\r`, so a raw 0x0D never appears inside a
+        // JSON string value.
+        buffer.append(Data(data.filter { $0 != 0x0D }))
         // SSE frames are separated by double-newline. Parse as many
         // complete frames as we have, keep the trailing partial.
         let separator = Data("\n\n".utf8)
         while let range = buffer.range(of: separator) {
             let frame = buffer.subdata(in: 0..<range.lowerBound)
             buffer.removeSubrange(0..<range.upperBound)
-            guard let text = String(data: frame, encoding: .utf8) else { continue }
-            // Strip "data: " prefix. Multi-line "data:" frames accumulate.
-            var payload = ""
-            for line in text.split(separator: "\n", omittingEmptySubsequences: true) {
-                let l = String(line)
-                if l.hasPrefix("data: ") {
-                    payload += String(l.dropFirst(6))
-                } else if l.hasPrefix("data:") {
-                    payload += String(l.dropFirst(5))
-                }
+            emitFrame(frame)
+        }
+    }
+
+    /// Decode one SSE frame ("data: …" lines) and emit its content delta.
+    private func emitFrame(_ frame: Data) {
+        guard let text = String(data: frame, encoding: .utf8) else { return }
+        // Strip "data: " prefix. Multi-line "data:" frames accumulate.
+        var payload = ""
+        for line in text.split(separator: "\n", omittingEmptySubsequences: true) {
+            let l = String(line)
+            if l.hasPrefix("data: ") {
+                payload += String(l.dropFirst(6))
+            } else if l.hasPrefix("data:") {
+                payload += String(l.dropFirst(5))
             }
-            let trimmed = payload.trimmingCharacters(in: .whitespacesAndNewlines)
-            if trimmed.isEmpty { continue }
-            if trimmed == "[DONE]" { continue }
-            // Parse the JSON chunk: {"choices":[{"delta":{"content":"..."}}]}
-            guard
-                let data = trimmed.data(using: .utf8),
-                let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                let choices = obj["choices"] as? [[String: Any]],
-                let first = choices.first,
-                let delta = first["delta"] as? [String: Any],
-                let content = delta["content"] as? String
-            else { continue }
-            if !content.isEmpty {
-                onEvent(content)
-            }
+        }
+        let trimmed = payload.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty { return }
+        if trimmed == "[DONE]" { return }
+        // Parse the JSON chunk: {"choices":[{"delta":{"content":"..."}}]}
+        guard
+            let data = trimmed.data(using: .utf8),
+            let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let choices = obj["choices"] as? [[String: Any]],
+            let first = choices.first,
+            let delta = first["delta"] as? [String: Any],
+            let content = delta["content"] as? String
+        else { return }
+        if !content.isEmpty {
+            onEvent(content)
         }
     }
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        // Flush any residual frame the server left unterminated (a stream
+        // that closes right after `data: {...}\n` with no trailing blank
+        // line would otherwise drop its last chunk).
+        if httpStatus == 0 || (200..<300).contains(httpStatus) {
+            let rest = buffer
+            buffer.removeAll()
+            if !rest.isEmpty { emitFrame(rest) }
+        }
         if let classified = classify(error: error) {
             onComplete(classified)
         } else {

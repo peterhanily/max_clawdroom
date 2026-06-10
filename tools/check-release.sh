@@ -82,6 +82,47 @@ else
   err "CHANGELOG.md: ${CHANGELOG_VERSION:-<none>} (expected ${EXPECTED})"
 fi
 
+# ── 2b. Public-facing docs (version + entitlement drift) ──────────────
+# Not release artefacts, but they recur as stale-doc bugs: the v0.3.1
+# README banner and SECURITY "current" row lingered two releases behind,
+# and NOTARIZATION.md kept describing entitlements that had been dropped.
+# These run in both modes (pure repo-state, no network) so a doc that
+# contradicts the trust positioning blocks the build.
+MINOR="${EXPECTED%.*}.x"
+MINOR_RE="${MINOR//./\\.}"
+EXPECTED_RE="${EXPECTED//./\\.}"
+
+if grep -qE "Public alpha[^v]*v${EXPECTED_RE}\b" README.md; then
+  ok "README.md alpha banner: v${EXPECTED}"
+else
+  err "README.md alpha banner not at v${EXPECTED} (stale 'Public alpha — vX.Y.Z')"
+fi
+
+if grep -E "^\| *${MINOR_RE} " SECURITY.md | grep -q "current"; then
+  ok "SECURITY.md supported-versions: ${MINOR} current"
+else
+  err "SECURITY.md 'current' row not at ${MINOR} (update the Supported versions table)"
+fi
+
+# NOTARIZATION.md must not describe a dropped entitlement as present. For
+# each notable Hardened-Runtime key, the "### Entitlements highlights"
+# block and the actual entitlements plist must agree: a key named in the
+# highlights block but absent from the plist is exactly the drift that
+# overstated the app's attack surface for releases.
+ENT_PLIST="Packaging/max_clawdroom.entitlements"
+ENT_DOC_BLOCK=$(sed -n '/^### Entitlements highlights/,/^### What is NOT entitled/p' NOTARIZATION.md)
+ENT_DRIFT=0
+for key in allow-jit allow-unsigned-executable-memory disable-library-validation allow-dyld-environment-variables; do
+  in_doc=0; in_plist=0
+  grep -q "$key" <<<"$ENT_DOC_BLOCK" && in_doc=1
+  /usr/libexec/PlistBuddy -c "Print :com.apple.security.cs.$key" "$ENT_PLIST" >/dev/null 2>&1 && in_plist=1
+  if [ "$in_doc" = 1 ] && [ "$in_plist" = 0 ]; then
+    err "NOTARIZATION.md highlights lists '${key}' but it's not in ${ENT_PLIST} (dropped-entitlement drift)"
+    ENT_DRIFT=1
+  fi
+done
+[ "$ENT_DRIFT" = 0 ] && ok "NOTARIZATION.md entitlement highlights consistent with ${ENT_PLIST}"
+
 # ── 3. Cask ───────────────────────────────────────────────────────────
 # Cask version is bumped AFTER the DMG exists (so the sha256 is real),
 # so it lags Info.plist during a release-in-progress. Skip in pre-build
